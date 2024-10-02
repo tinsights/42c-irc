@@ -15,6 +15,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <cstring>
+#include <poll.h>
 
 using std::cout;
 using std::endl;
@@ -90,20 +91,48 @@ int main(void) {
 	 * 
 	 * TODO: error checking (i.e. check return value)
 	*/
-	sockaddr_storage remote;
-	socklen_t len = sizeof remote;
-	int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
+	// sockaddr_storage remote;
+	// socklen_t len = sizeof remote;
+	// int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
 
+	size_t fd_max = 10;
+	size_t fd_count = 1;
+	struct pollfd fds[fd_max];
+	fds[0].fd = server_socket;
+	fds[0].events = POLLIN;
 
-	char buffer[1024] = {0};
-	int sz = 0;
-	do {
-		sz = recv(client_socket, buffer, sizeof(buffer), 0);
-		cout << "sz: " << sz << " " << buffer;
-		memset(buffer, 0, sizeof buffer);
-	} while (sz > 0);
-	cout << server_socket << endl;
-	cout << client_socket << endl;
+	for (;;) {
+		int poll_count = poll(fds, fd_count, -1);
+		
+		for (size_t i = 0; i < fd_max; ++i) {
+			if (fds[i].revents & POLLIN) {
+				if (fds[i].fd == server_socket) {
+					sockaddr_storage remote;
+					socklen_t len = sizeof remote;
+					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
+					fds[fd_count].fd = client_socket;
+					fds[fd_count].events = POLLIN;
+					fd_count++;
+				}
+				else {
+					char buffer[1024] = {0};
+					int sz = 0;
+					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
+					cout << "sz: " << sz << " " << buffer;
+					memset(buffer, 0, sizeof buffer);
+					if (sz <= 0) {
+						close(fds[i].fd);
+						fd_count--;
+					}
+				}
+			}
+		}
+		if (poll_count == 0) // maybe unnec
+			break;
+	}
+
+	// cout << server_socket << endl;
+	// cout << client_socket << endl;
 	close(server_socket);
-	close(client_socket);
+	// close(client_socket);
 }
