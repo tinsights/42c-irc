@@ -118,12 +118,17 @@ int main(void) {
 					char buffer[1024] = {0};
 					int sz = 0;
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
-					cout << "sz: " << sz << " " << buffer;
-					memset(buffer, 0, sizeof buffer);
+					// cout << "sz: " << sz << " " << buffer;
 					if (sz <= 0) {
 						close(fds[i].fd);
 						fd_count--;
+					} else {
+						for (size_t j = 1; j < fd_count; ++j) {
+							if (j != i)
+								send(fds[j].fd, buffer, sizeof buffer, 0);
+						}
 					}
+					memset(buffer, 0, sizeof buffer);
 				}
 			}
 		}
