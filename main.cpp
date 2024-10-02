@@ -82,19 +82,6 @@ int main(void) {
 	*/
 	listen(server_socket, 10);
 
-	/**
-	 * int accept(int s, struct sockaddr *addr, socklen_t *addrlen)
-	 * 
-	 * accept() returns another socket file descriptor, one that is connected to the client.
-	 * it fills sockaddr *addr with information about the connecting client, 
-	 * and returns a new socket FD that can be used for send() and recv()
-	 * 
-	 * TODO: error checking (i.e. check return value)
-	*/
-	// sockaddr_storage remote;
-	// socklen_t len = sizeof remote;
-	// int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
-
 	size_t fd_max = 10;
 	size_t fd_count = 1;
 	struct pollfd fds[fd_max];
@@ -107,11 +94,23 @@ int main(void) {
 		for (size_t i = 0; i < fd_max; ++i) {
 			if (fds[i].revents & POLLIN) {
 				if (fds[i].fd == server_socket) {
+					// received new client connection,
+					// to be added to fds array
 					sockaddr_storage remote;
 					socklen_t len = sizeof remote;
+					/**
+					 * int accept(int s, struct sockaddr *addr, socklen_t *addrlen)
+					 * 
+					 * accept() returns another socket file descriptor, one that is connected to the client.
+					 * it fills sockaddr *addr with information about the connecting client, 
+					 * and returns a new socket FD that can be used for send() and recv()
+					 * 
+					 * TODO: error checking (i.e. check return value)
+					*/
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
 					fds[fd_count].fd = client_socket;
 					fds[fd_count].events = POLLIN;
+					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " joined!" << endl;
 					fd_count++;
 				}
 				else {
@@ -120,11 +119,14 @@ int main(void) {
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					// cout << "sz: " << sz << " " << buffer;
 					if (sz <= 0) {
+						cout << "client " << i << " at fd " <<  fds[i].fd << "quit." << endl;
 						close(fds[i].fd);
 						fd_count--;
 					} else {
+						// broadcast to other clients
+						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
 						for (size_t j = 1; j < fd_count; ++j) {
-							if (j != i)
+							if (fds[j].fd != fds[i].fd)
 								send(fds[j].fd, buffer, sizeof buffer, 0);
 						}
 					}
