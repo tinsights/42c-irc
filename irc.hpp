@@ -18,11 +18,13 @@
 # include <netdb.h> // cpp ver?
 # include <iostream>
 # include <unistd.h>
+# include <string>
 # include <cstring>
 # include <poll.h>
 
 using std::cout;
 using std::endl;
+using std::string;
 
 typedef struct addrinfo ai;
 

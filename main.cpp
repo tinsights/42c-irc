@@ -12,6 +12,9 @@
 
 #include "irc.hpp"
 #include <csignal>
+#include <map>
+#include <algorithm>
+
 #define MAX_CONNS 10
 
 int		get_server_socket();
@@ -26,6 +29,29 @@ void handler(int sig) {
 	}
 }
 
+class Client {
+	public:
+		Client(int fd, string ip) { socket = fd; ip_addr = ip; std::clog << ip << "  " << ip_addr.c_str() << "  " << ip_addr.length() << endl;} ;
+		// TODO: copy
+		~Client() {};
+		int 	socket;
+		string	ip_addr;
+		string	nick;
+	private:
+		Client() {};
+		
+};
+
+// needs to be a class:
+typedef struct s_client {
+	int 	socket;
+	string 	ip_addr;
+	string	nick;
+
+} t_client;
+
+# define BLACK   "\033[30m"      /* Black */
+# define RED     "\033[31m"      /* Red */
 int main(void) {
 
 	struct sigaction sa;
@@ -39,6 +65,8 @@ int main(void) {
 	int server_socket = get_server_socket();
 	fds[0].fd = server_socket;
 	fds[0].events = POLLIN;
+
+	std::map<int, Client> clients;
 
 	while (server_running) {
 		int poll_count = poll(fds, fd_count, -1);
@@ -62,12 +90,17 @@ int main(void) {
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
 					fds[fd_count].fd = client_socket;
 					fds[fd_count].events = POLLIN;
-					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " joined!" << endl;
 
 					// Get client IP address
 					char ip_str[INET_ADDRSTRLEN];
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
-					cout << ip_str << endl;
+
+					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" << endl;
+					Client client(client_socket, ip_str);
+					clients.insert(std::pair<int, Client>(client_socket, client));
+					send(clients.at(client_socket).socket, clients.at(client_socket).ip_addr.c_str(), sizeof ip_str, 0);
+					send(clients.at(client_socket).socket, " $> ", 4, 0);
+
 					fd_count++;
 				}
 				else {
@@ -81,9 +114,17 @@ int main(void) {
 					} else {
 						// broadcast to other clients
 						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
+						send(clients.at(fds[i].fd).socket, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
+						send(clients.at(fds[i].fd).socket, " $> ", 4, 0);
 						for (size_t j = 1; j < fd_count; ++j) {
-							if (fds[j].fd != fds[i].fd)
+							if (fds[j].fd != fds[i].fd) {
+								send(fds[j].fd, "\r\f", 2, 0);
+								send(fds[j].fd, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
+								send(fds[j].fd, ": ", 2, 0);
 								send(fds[j].fd, buffer, sizeof buffer, 0);
+								send(fds[j].fd, clients.at(fds[j].fd).ip_addr.c_str(), clients.at(fds[j].fd).ip_addr.length(), 0);
+								send(fds[j].fd, " $> ", 4, 0);
+							}
 						}
 					}
 					memset(buffer, 0, sizeof buffer);
