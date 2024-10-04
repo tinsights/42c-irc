@@ -12,12 +12,12 @@
 
 NAME = ircserv
 
-SRCS = main.cpp
+SRCS = main.cpp utils.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(SRCS:.cpp=.d)
 
 CC = c++
-CFLAGS = -Wall -Werror -Wextra -std=c++98
+CFLAGS = -Wall -Werror -Wextra -g -std=c++98
 CPPFLAGS = -MMD -MP
 
 all: $(NAME)

@@ -1,0 +1,3 @@
+--track-origins=yes
+--track-fds=yes
+--leak-check=full

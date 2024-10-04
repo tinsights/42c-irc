@@ -10,94 +10,44 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <sys/socket.h> // cpp ver?
-#include <netdb.h> // cpp ver?
-#include <iostream>
-#include <unistd.h>
-#include <cstring>
-#include <poll.h>
+#include "irc.hpp"
+#include <csignal>
+#define MAX_CONNS 10
 
-using std::cout;
-using std::endl;
+int		get_server_socket();
+void	convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize);
 
-typedef struct addrinfo ai;
+volatile sig_atomic_t server_running = 1;
+
+
+void handler(int sig) {
+	if (sig == SIGINT) {
+		server_running = false;
+	}
+}
 
 int main(void) {
 
-	/**
-	 * //OLD WAY! :
-	 * sockaddr_in server_addr = {
-	 * 	.sin_family = AF_INET,		// Address Family IPV4
-	 * 	.sin_port = htons(8080),	// Host to network byte order (short) 8080
-	 * 	.sin_addr = { INADDR_ANY }, // Accept from any address
-	 * };
-	 * 
-	 * new way of getting config options:
-	*/
-	ai hints, *res;
+	struct sigaction sa;
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = handler;
+	sigaction(SIGINT, &sa, NULL);
 
-	memset(&hints, 0, sizeof hints);
-
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-
-	getaddrinfo(NULL, "8080", &hints, &res);
-	
-	/**
-	 * #include <sys/types.h>
-	 * #include <sys/socket.h>
-	 * int socket(int domain, int type, int protocol);
-	 * 
-	 * socket() returns a new file descriptor configured to act as a socket
-	 * with the specified domain (Protocol Family), type (datagram or TCP),
-	 * and protocol (getprotobyname())
-	 * 
-	 * TODO: error checking (i.e. check return value)
-	*/
-	int server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-	/**
-	 * int bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
-	 * 
-	 * bind() associates a socket with an IP address and a port number.
-	 * Prior to this a socket is just a file / file descriptor.
-	 * this socket listens to connections.
-	 * 
-	 * TODO: error checking (i.e. check return value)
-	*/
-	bind(server_socket, res->ai_addr, res->ai_addrlen);
-
-	/**
-	 * int listen(int s, int backlog);
-	 * 
-	 * This instructs the socket to listen for incoming connections from client programs:
-	 * The second argument is the number of incoming connections
-	 * that can be queued before you call accept(), below.
-	 * 
-	 * If there are this many connections waiting to be accepted,
-	 * additional clients will generate the error ECONNREFUSED.
-	 * 
-	 * TODO: error checking (i.e. check return value)
-	*/
-	listen(server_socket, 10);
-
-	size_t fd_max = 10;
 	size_t fd_count = 1;
-	struct pollfd fds[fd_max];
+	struct pollfd fds[MAX_CONNS];
+	memset(fds, 0, sizeof fds);
+	int server_socket = get_server_socket();
 	fds[0].fd = server_socket;
 	fds[0].events = POLLIN;
 
-	for (;;) {
+	while (server_running) {
 		int poll_count = poll(fds, fd_count, -1);
 		
-		for (size_t i = 0; i < fd_max; ++i) {
+		for (size_t i = 0; i < fd_count; ++i) {
 			if (fds[i].revents & POLLIN) {
 				if (fds[i].fd == server_socket) {
 					// received new client connection,
 					// to be added to fds array
-					sockaddr_storage remote;
-					socklen_t len = sizeof remote;
 					/**
 					 * int accept(int s, struct sockaddr *addr, socklen_t *addrlen)
 					 * 
@@ -107,17 +57,23 @@ int main(void) {
 					 * 
 					 * TODO: error checking (i.e. check return value)
 					*/
+					sockaddr_in remote;
+					socklen_t len = sizeof remote;
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
 					fds[fd_count].fd = client_socket;
 					fds[fd_count].events = POLLIN;
 					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " joined!" << endl;
+
+					// Get client IP address
+					char ip_str[INET_ADDRSTRLEN];
+					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
+					cout << ip_str << endl;
 					fd_count++;
 				}
 				else {
 					char buffer[1024] = {0};
 					int sz = 0;
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
-					// cout << "sz: " << sz << " " << buffer;
 					if (sz <= 0) {
 						cout << "client " << i << " at fd " <<  fds[i].fd << "quit." << endl;
 						close(fds[i].fd);
@@ -138,8 +94,10 @@ int main(void) {
 			break;
 	}
 
-	// cout << server_socket << endl;
-	// cout << client_socket << endl;
-	close(server_socket);
-	// close(client_socket);
+	cout << server_socket << endl;
+	cout << fd_count << endl;
+	cout << "EXITING" << endl;
+	
+	for (size_t i = 0; i < fd_count; ++i)
+		close(fds[i].fd);
 }
