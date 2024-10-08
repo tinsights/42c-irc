@@ -37,6 +37,7 @@ class Client {
 		int 	socket;
 		string	ip_addr;
 		string	nick;
+		string	remainder;
 	private:
 		Client() {};
 		
@@ -112,23 +113,31 @@ int main(void) {
 						close(fds[i].fd);
 						fd_count--;
 					} else {
-						// broadcast to other clients
+						// parse message into command
 						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
-						char reply[] = ":localhost 001 tjegades :Welcome to the Internet Relay Network tjegades!tjegades@localhost\r\n";
-						cout << sizeof reply << " " << reply << endl;
-						send(clients.at(fds[i].fd).socket, reply, sizeof reply, 0);
-						// send(clients.at(fds[i].fd).socket, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
-						// send(clients.at(fds[i].fd).socket, " $> ", 4, 0);
-						// for (size_t j = 1; j < fd_count; ++j) {
-						// 	if (fds[j].fd != fds[i].fd) {
-						// 		send(fds[j].fd, "\r\f", 2, 0);
-						// 		send(fds[j].fd, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
-						// 		send(fds[j].fd, ": ", 2, 0);
-						// 		send(fds[j].fd, buffer, sizeof buffer, 0);
-						// 		send(fds[j].fd, clients.at(fds[j].fd).ip_addr.c_str(), clients.at(fds[j].fd).ip_addr.length(), 0);
-						// 		send(fds[j].fd, " $> ", 4, 0);
-						// 	}
-						// }
+						string message(buffer);
+						if (clients.at(fds[i].fd).remainder.length()) {
+							message.insert(0, clients.at(fds[i].fd).remainder);
+						}
+						if (!message.empty()) {
+							size_t idx = message.find("\r\n", 0);
+							while (idx != string::npos) {
+								cout << "idx: " << idx << endl;
+								string cmd = message.substr(0, idx+1);
+								cout << "cmd: " << cmd << endl;
+
+								message.erase(0, idx + 2);
+								cout << "message: " << message << endl;
+
+								idx = message.find("\r\n", idx + 2);
+							}
+							if (!message.empty()) {
+								clients.at(fds[i].fd).remainder = message;
+							} else {
+								clients.at(fds[i].fd).remainder.clear();
+							}
+						}
+
 					}
 					memset(buffer, 0, sizeof buffer);
 				}
