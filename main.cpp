@@ -37,22 +37,138 @@ class Client {
 		int 	socket;
 		string	ip_addr;
 		string	nick;
+		string	user;
+		string	host;
+		string	fullname;
 		string	remainder;
+		bool	auth;
+		bool	registered;
+
 	private:
 		Client() {};
 		
 };
 
-// needs to be a class:
-typedef struct s_client {
-	int 	socket;
-	string 	ip_addr;
-	string	nick;
+class Message {
+	public:
+	Message(string raw) {
+		/**
+		 * TODO: 
+		 * 	sanity checks (length, not empty, etc.)
+		 * 	ends with CRLF?
+		 * 	total validity check? max 2 colons? num spaces? etc
+		 * 
+		 * */ 
+		if (raw.find_first_of(':') == 0) {
+			prefix = raw.substr(0, raw.find_first_of(' '));
+			raw.erase(0, raw.find_first_of(' ') + 1);
+		} else {
+			prefix = "";
+		}
+		cmd = raw.substr(0, raw.find_first_of(' '));
+		raw.erase(0, raw.find_first_of(' ') + 1);
+		
+		if (raw.length()) {
+			size_t trail_index = raw.find_first_of(':');
+			params = raw.substr(0, trail_index);
+			if (trail_index != string::npos) {
+				trailing = raw.substr(trail_index + 1);
+			}
+		}
+		cout << "Prefix: " << prefix << "\nCmd: " << cmd << "\nParams: " << params << "\nTrail: " << trailing << endl;
+	};
+	~Message() {};
 
-} t_client;
+	// eventually private.. i think?
+	string	input;
+	string	cmd;
+	string	prefix;
+	string	trailing;
+	string	params;
+	bool	valid;
+	private:
 
-# define BLACK   "\033[30m"      /* Black */
-# define RED     "\033[31m"      /* Red */
+};
+
+#define NUM_CMDS 4
+void execute_cmd(Client &cl, string &cmd) {
+	Message msg(cmd);
+	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG"};
+	int index = -1;
+	for (int i = 0; i < NUM_CMDS; ++i) {
+		if (msg.cmd == cmds[i]) {
+			// cout << cmds[i] << endl;
+			// string response = "Received: ";
+			// response.append(cmd);
+			// send(cl.socket, response.c_str(), response.length(), 0);
+			index = i;
+			break;
+		}
+	}
+	// upstream msg validity check??
+	string response = "";
+	switch (index) {
+		case -1:
+			response.append("421 ");
+			response.append(cl.nick);
+			response.append(" ");
+			response.append(msg.cmd);
+			response.append(" :Unknown command\r\n");
+			break;
+		case 0: // PASS
+			if (msg.cmd.length() && cl.auth == false && cl.registered == false)
+				cl.auth = true;
+			cout << "PASS: " << msg.params << endl;
+			break;
+		case 1: // NICK
+			if (msg.params.length()) {
+				cl.nick = msg.params;
+			}
+			cout << "NICK: " << cl.nick << endl;
+			break;
+		case 2: // USER must check num of params correct
+			if (msg.params.length() && msg.trailing.length() && cl.nick.length()) {
+				cl.user = msg.params.substr(0, msg.params.find_first_of(' '));
+				cl.host = msg.params.substr(msg.params.find_first_of(' ') + 1 , msg.params.find_first_of(' ', msg.params.find_first_of(' ') + 1) - msg.params.find_first_of(' '));
+				cout << "\tCL NICK:" << cl.nick << endl;
+				cl.fullname.append(cl.nick);
+				cl.fullname.append("!");
+				cl.fullname.append(cl.user);
+				cl.fullname.append("@");
+				cl.fullname.append("localhost");
+				cout << endl << "FULLNAME: " << cl.fullname << endl;
+			}
+			cout << "\tUSER: " << cl.user << endl;
+			cout << "\tNICK: " << cl.nick << endl;
+			cout << "\tHOST: " << cl.host << endl;
+			cout << "\tMSG: " << msg.cmd << " PARAMS: " << msg.params << endl;
+			cout << "\tFULLNAME: " << cl.fullname << endl;
+			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
+				cl.registered = true;
+				response = ":localhost 001 ";
+				response.append(cl.nick);
+				response.append(" :Welcome to the Internet Relay Network ");
+				response.append(cl.fullname);
+				response.append("\r\n");
+			} else {
+				cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
+			}
+			break;
+		default:
+			break;
+	}
+	if (response.length()) {
+
+		cout << "RESPONSE: " << response << endl;
+		string hardcoded = ":localhost 001 tjegades :Welcome to the Internet Relay Network tjegades!tjegades@localhost\r\n";
+		cout << "RESPONSE: " << hardcoded << endl;
+		send(cl.socket, response.c_str(), response.length(), 0);
+		response.erase();
+	}
+}
+
+//:localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>
+
 int main(void) {
 
 	struct sigaction sa;
@@ -113,28 +229,37 @@ int main(void) {
 						close(fds[i].fd);
 						fd_count--;
 					} else {
+						Client &cl = clients.at(fds[i].fd);
 						// parse message into command
 						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
 						string message(buffer);
-						if (clients.at(fds[i].fd).remainder.length()) {
-							message.insert(0, clients.at(fds[i].fd).remainder);
+						if (cl.remainder.length()) {
+							message.insert(0, cl.remainder);
 						}
 						if (!message.empty()) {
 							size_t idx = message.find("\r\n", 0);
 							while (idx != string::npos) {
 								cout << "idx: " << idx << endl;
-								string cmd = message.substr(0, idx+1);
+								string cmd = message.substr(0, idx);
 								cout << "cmd: " << cmd << endl;
 
-								message.erase(0, idx + 2);
-								cout << "message: " << message << endl;
+								/**
+								 * TODO: execute command if valid
+								 * before proceeding to next command
+								*/
+						
+								execute_cmd(cl, cmd);
 
-								idx = message.find("\r\n", idx + 2);
+
+								message.erase(0, idx + 2);
+								// cout << "message: " << message << endl;
+
+								idx = message.find("\r\n", 0);
 							}
 							if (!message.empty()) {
-								clients.at(fds[i].fd).remainder = message;
-							} else {
-								clients.at(fds[i].fd).remainder.clear();
+								cl.remainder = message;
+							} else if (cl.remainder.length()) {
+								cl.remainder.clear();
 							}
 						}
 
