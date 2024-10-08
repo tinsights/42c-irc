@@ -98,8 +98,8 @@ int main(void) {
 					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" << endl;
 					Client client(client_socket, ip_str);
 					clients.insert(std::pair<int, Client>(client_socket, client));
-					send(clients.at(client_socket).socket, clients.at(client_socket).ip_addr.c_str(), sizeof ip_str, 0);
-					send(clients.at(client_socket).socket, " $> ", 4, 0);
+					// send(clients.at(client_socket).socket, clients.at(client_socket).ip_addr.c_str(), sizeof ip_str, 0);
+					// send(clients.at(client_socket).socket, " $> ", 4, 0);
 
 					fd_count++;
 				}
@@ -114,18 +114,21 @@ int main(void) {
 					} else {
 						// broadcast to other clients
 						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
-						send(clients.at(fds[i].fd).socket, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
-						send(clients.at(fds[i].fd).socket, " $> ", 4, 0);
-						for (size_t j = 1; j < fd_count; ++j) {
-							if (fds[j].fd != fds[i].fd) {
-								send(fds[j].fd, "\r\f", 2, 0);
-								send(fds[j].fd, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
-								send(fds[j].fd, ": ", 2, 0);
-								send(fds[j].fd, buffer, sizeof buffer, 0);
-								send(fds[j].fd, clients.at(fds[j].fd).ip_addr.c_str(), clients.at(fds[j].fd).ip_addr.length(), 0);
-								send(fds[j].fd, " $> ", 4, 0);
-							}
-						}
+						char reply[] = ":localhost 001 tjegades :Welcome to the Internet Relay Network tjegades!tjegades@localhost\r\n";
+						cout << sizeof reply << " " << reply << endl;
+						send(clients.at(fds[i].fd).socket, reply, sizeof reply, 0);
+						// send(clients.at(fds[i].fd).socket, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
+						// send(clients.at(fds[i].fd).socket, " $> ", 4, 0);
+						// for (size_t j = 1; j < fd_count; ++j) {
+						// 	if (fds[j].fd != fds[i].fd) {
+						// 		send(fds[j].fd, "\r\f", 2, 0);
+						// 		send(fds[j].fd, clients.at(fds[i].fd).ip_addr.c_str(), clients.at(fds[i].fd).ip_addr.length(), 0);
+						// 		send(fds[j].fd, ": ", 2, 0);
+						// 		send(fds[j].fd, buffer, sizeof buffer, 0);
+						// 		send(fds[j].fd, clients.at(fds[j].fd).ip_addr.c_str(), clients.at(fds[j].fd).ip_addr.length(), 0);
+						// 		send(fds[j].fd, " $> ", 4, 0);
+						// 	}
+						// }
 					}
 					memset(buffer, 0, sizeof buffer);
 				}

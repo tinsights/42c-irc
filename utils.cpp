@@ -50,6 +50,11 @@ int get_server_socket() {
 	server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
 	/**
+	 * TODO: understand...
+	*/
+	int optval = 1;
+	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+	/**
 	 * int bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
 	 * 
 	 * bind() associates a socket with an IP address and a port number.
