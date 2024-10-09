@@ -40,6 +40,7 @@ class Client {
 		string	user;
 		string	host;
 		string	server;
+		string	realname;
 		string	fullname;
 		string	remainder;
 		bool	auth;
@@ -120,9 +121,9 @@ void execute_cmd(Client &cl, string &cmd) {
 			response.append(" :Unknown command\r\n");
 			break;
 		case 0: // PASS
-			if (msg.cmd.length() && cl.auth == false && cl.registered == false)
+			if (msg.params.length() && cl.auth == false && cl.registered == false)
 				cl.auth = true;
-			cout << "PASS: " << msg.params << endl;
+			cout << "\tPASS: " << msg.params << endl;
 			break;
 		case 1: // NICK
 			if (msg.params.length()) {
@@ -134,7 +135,7 @@ void execute_cmd(Client &cl, string &cmd) {
 					cl.nick = msg.params;
 				}
 			}
-			cout << "NICK: " << cl.nick << endl;
+			cout << "\tNICK: " << cl.nick << endl;
 			break;
 		case 2: // USER must check num of params correct
 				// <username> <hostname> <servername> :<realname>
@@ -147,15 +148,22 @@ void execute_cmd(Client &cl, string &cmd) {
 				ss >> cl.user;
 				ss >> cl.host;
 				ss >> cl.server;
-				ss >> cl.fullname;
+				ss >> cl.realname;
+				string fullname = "";
+				fullname.append(cl.nick);
+				fullname.append("!");
+				fullname.append(cl.user);
+				fullname.append("@");
+				fullname.append(cl.server);
+				cl.fullname = fullname;
 				cout << "\tCL NICK:" << cl.nick << endl;
-				cout << endl << "FULLNAME: " << cl.fullname << endl;
+				cout << endl << "REALNAME: " << cl.realname << endl;
 			}
 			cout << "\tUSER: " << cl.user << endl;
 			cout << "\tNICK: " << cl.nick << endl;
 			cout << "\tHOST: " << cl.host << endl;
 			cout << "\tMSG: " << msg.cmd << " PARAMS: " << msg.params << endl;
-			cout << "\tFULLNAME: " << cl.fullname << endl;
+			cout << "\trealname: " << cl.realname << endl;
 
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				cl.registered = true;
@@ -163,15 +171,46 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append("001 ");
 				response.append(cl.nick);
 				response.append(" :Welcome to the Internet Relay Network ");
-				response.append(cl.nick);
-				response.append("!");
-				response.append(cl.user);
-				response.append("@");
-				response.append(cl.server);
+				response.append(cl.fullname);
 			} else {
 				cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
 			}
 			break;
+		case 3: // PRIVMSG
+			if (msg.params.length()) {
+				if (msg.params.find_first_of(' ') != string::npos) {
+					string recpt = msg.params.substr(0, msg.params.find_first_of(' '));
+					if (Client::client_list.find(recpt) != Client::client_list.end()) {
+						string message;
+						message
+							.append(":")
+							.append(cl.fullname)
+							.append(" PRIVMSG ")
+							.append(recpt)
+							.append(" :")
+							.append(msg.trailing)
+							.append("\r\n");
+						send(Client::client_list.at(recpt).socket, message.c_str(), message.length(), 0);
+					} else {
+						response.append("401 ");
+						response.append(cl.nick);
+						// response.append(" :No such nick (");
+						response.append(recpt);
+						// response.append(")");
+					}
+				}
+				else {
+					response.append("412 ");
+					response.append(cl.nick);
+					response.append(" :No text to send");
+				}
+
+			} else {
+				response.append("411 ");
+				response.append(cl.nick);
+				response.append(" :No recipient given (PRIVMSG)");
+			}
+
 		default:
 			break;
 	}
