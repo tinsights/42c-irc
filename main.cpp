@@ -14,8 +14,8 @@
 #include <csignal>
 #include <map>
 #include <algorithm>
+#include <sstream>
 
-#define MAX_CONNS 10
 
 int		get_server_socket();
 void	convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize);
@@ -39,16 +39,19 @@ class Client {
 		string	nick;
 		string	user;
 		string	host;
+		string	server;
 		string	fullname;
 		string	remainder;
 		bool	auth;
 		bool	registered;
 
+		static std::map<string, Client &> client_list;
+
 	private:
 		Client() {};
 		
 };
-
+std::map<string, Client &> Client::client_list;
 class Message {
 	public:
 	Message(string raw) {
@@ -106,13 +109,14 @@ void execute_cmd(Client &cl, string &cmd) {
 		}
 	}
 	// upstream msg validity check??
-	string response = "";
+	string	response = "";
+
 	switch (index) {
 		case -1:
 			response.append("421 ");
 			response.append(cl.nick);
 			response.append(" ");
-			response.append(msg.cmd);
+			response.append(msg.cmd); 	
 			response.append(" :Unknown command\r\n");
 			break;
 		case 0: // PASS
@@ -122,20 +126,29 @@ void execute_cmd(Client &cl, string &cmd) {
 			break;
 		case 1: // NICK
 			if (msg.params.length()) {
-				cl.nick = msg.params;
+				if (Client::client_list.find(msg.params) != Client::client_list.end() ) {
+					response.append("433 * ");
+					response.append(msg.params);
+					response.append(" :Nickname is already in use.");
+				} else {
+					cl.nick = msg.params;
+				}
 			}
 			cout << "NICK: " << cl.nick << endl;
 			break;
 		case 2: // USER must check num of params correct
+				// <username> <hostname> <servername> :<realname>
+
 			if (msg.params.length() && msg.trailing.length() && cl.nick.length()) {
-				cl.user = msg.params.substr(0, msg.params.find_first_of(' '));
-				cl.host = msg.params.substr(msg.params.find_first_of(' ') + 1 , msg.params.find_first_of(' ', msg.params.find_first_of(' ') + 1) - msg.params.find_first_of(' '));
+				// size_t space_idx = msg.params.find_first_of(' ');
+				// cl.user = msg.params.substr(0, space_idx);
+				// cl.host = msg.params.substr(space_idx + 1 , msg.params.find_first_of(' ', space_idx) - space_idx);
+				std::stringstream ss(msg.params);
+				ss >> cl.user;
+				ss >> cl.host;
+				ss >> cl.server;
+				ss >> cl.fullname;
 				cout << "\tCL NICK:" << cl.nick << endl;
-				cl.fullname.append(cl.nick);
-				cl.fullname.append("!");
-				cl.fullname.append(cl.user);
-				cl.fullname.append("@");
-				cl.fullname.append("localhost");
 				cout << endl << "FULLNAME: " << cl.fullname << endl;
 			}
 			cout << "\tUSER: " << cl.user << endl;
@@ -143,13 +156,18 @@ void execute_cmd(Client &cl, string &cmd) {
 			cout << "\tHOST: " << cl.host << endl;
 			cout << "\tMSG: " << msg.cmd << " PARAMS: " << msg.params << endl;
 			cout << "\tFULLNAME: " << cl.fullname << endl;
+
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				cl.registered = true;
-				response = ":localhost 001 ";
+				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
+				response.append("001 ");
 				response.append(cl.nick);
 				response.append(" :Welcome to the Internet Relay Network ");
-				response.append(cl.fullname);
-				response.append("\r\n");
+				response.append(cl.nick);
+				response.append("!");
+				response.append(cl.user);
+				response.append("@");
+				response.append(cl.server);
 			} else {
 				cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
 			}
@@ -158,16 +176,15 @@ void execute_cmd(Client &cl, string &cmd) {
 			break;
 	}
 	if (response.length()) {
-
+		response.append("\r\n");
 		cout << "RESPONSE: " << response << endl;
-		string hardcoded = ":localhost 001 tjegades :Welcome to the Internet Relay Network tjegades!tjegades@localhost\r\n";
-		cout << "RESPONSE: " << hardcoded << endl;
 		send(cl.socket, response.c_str(), response.length(), 0);
 		response.erase();
 	}
 }
 
 //:localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>
+#define MAX_CONNS 100
 
 int main(void) {
 
@@ -183,8 +200,8 @@ int main(void) {
 	fds[0].fd = server_socket;
 	fds[0].events = POLLIN;
 
-	std::map<int, Client> clients;
-
+	std::map<int, Client> connections;
+	// Client::client_list;
 	while (server_running) {
 		int poll_count = poll(fds, fd_count, -1);
 		
@@ -214,10 +231,7 @@ int main(void) {
 
 					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" << endl;
 					Client client(client_socket, ip_str);
-					clients.insert(std::pair<int, Client>(client_socket, client));
-					// send(clients.at(client_socket).socket, clients.at(client_socket).ip_addr.c_str(), sizeof ip_str, 0);
-					// send(clients.at(client_socket).socket, " $> ", 4, 0);
-
+					connections.insert(std::pair<int, Client>(client_socket, client));
 					fd_count++;
 				}
 				else {
@@ -226,10 +240,12 @@ int main(void) {
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
 						cout << "client " << i << " at fd " <<  fds[i].fd << "quit." << endl;
+						Client::client_list.erase(connections.at(fds[i].fd).nick);
 						close(fds[i].fd);
+						connections.erase(fds[i].fd);
 						fd_count--;
 					} else {
-						Client &cl = clients.at(fds[i].fd);
+						Client &cl = connections.at(fds[i].fd);
 						// parse message into command
 						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
 						string message(buffer);
