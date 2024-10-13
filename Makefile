@@ -38,6 +38,7 @@ re: fclean all
 
 debug: CFLAGS += -g -D DEBUG=1
 debug: re
+	valgrind ./$(NAME)
 
 -include $(DEPS)
 

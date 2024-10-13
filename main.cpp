@@ -395,7 +395,15 @@ int main(void) {
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
 						YEET "client " << i << " at fd " <<  fds[i].fd << "quit." ENDL;
-						Client::client_list.erase(connections.at(fds[i].fd).nick);
+						if (connections.at(fds[i].fd).nick.length())
+							Client::client_list.erase(connections.at(fds[i].fd).nick);
+
+						// try {
+						// 	Client::client_list.erase(connections.at(fds[i].fd).nick);
+						// }
+						// catch (std::exception const & e) {
+						// 	std::cerr << e.what() << endl; // most likely no nick.
+						// }
 						close(fds[i].fd);
 						connections.erase(fds[i].fd);
 						fd_count--;
@@ -420,7 +428,7 @@ int main(void) {
 								*/
 						
 								execute_cmd(cl, cmd);
-
+								// YEET "after exec cmd";
 
 								message.erase(0, idx + 2);
 								// cout << "message: " << message << endl;
