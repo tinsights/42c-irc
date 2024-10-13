@@ -17,6 +17,8 @@
 #include <set>
 #include <algorithm>
 #include <sstream>
+#include <iomanip>
+using std::setw;
 
 
 int		get_server_socket();
@@ -33,7 +35,7 @@ void handler(int sig) {
 
 class Client {
 	public:
-		Client(int fd, string ip) { socket = fd; ip_addr = ip; std::clog << ip << "  " << ip_addr.c_str() << "  " << ip_addr.length() << endl;} ;
+		Client(int fd, string ip) : socket(fd), ip_addr(ip), nick(""), user(""), host(""), server(""), realname(""), fullname(""), remainder(""), auth(false), registered(false) {};
 		// TODO: copy
 		~Client() {};
 		int 	socket;
@@ -85,7 +87,11 @@ class Message {
 				trailing = raw.substr(trail_index + 1);
 			}
 		}
-		cout << "Prefix: " << prefix << "\nCmd: " << cmd << "\nParams: " << params << "\nTrail: " << trailing << endl;
+		YEET BOLDRED << setw(20) << "Prefix: " << prefix ENDL;
+		YEET BOLDRED << setw(20) << "Cmd: " << cmd ENDL;
+		YEET BOLDRED << setw(20) << "Params: " << params ENDL;
+		YEET BOLDRED << setw(20) << "Trail: " << trailing ENDL;
+		YEET "" ENDL;
 	};
 	~Message() {};
 
@@ -127,13 +133,16 @@ void execute_cmd(Client &cl, string &cmd) {
 	switch (index) {
 		case -1:
 			response.append("421 ");
-			response.append(cl.nick);
+			if (cl.nick.length())
+				response.append(cl.nick);
+			else
+				response.append("*"); // can set to default
 			response.append(" ");
 			response.append(msg.cmd); 	
-			response.append(" :Unknown command\r\n");
+			response.append(" :Unknown command");
 			break;
 		case 0: // PASS
-			cout << "\tPASS: " << msg.params << endl;
+			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
 
 			if (msg.params.length()) {
 				if (cl.registered == false) {
@@ -164,17 +173,15 @@ void execute_cmd(Client &cl, string &cmd) {
 					cl.nick = msg.params;
 				}
 			}
-			cout << "\tNICK: " << cl.nick << endl;
+			// cout << "\tNICK: " << cl.nick << endl;
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
 				fullname.append(cl.nick);
 				fullname.append("!");
 				fullname.append(cl.user);
 				fullname.append("@");
-				fullname.append(cl.server);
+				fullname.append(cl.ip_addr);
 				cl.fullname = fullname;
-				cout << "\tCL NICK:" << cl.nick << endl;
-				cout << endl << "REALNAME: " << cl.realname << endl;
 				cl.registered = true;
 				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
 				response.append("001 ");
@@ -182,7 +189,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append(" :Welcome to the Internet Relay Network ");
 				response.append(cl.fullname);
 			} else {
-				cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
+				// cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
 			}
 			break;
 		case 2: // USER 
@@ -200,12 +207,12 @@ void execute_cmd(Client &cl, string &cmd) {
 				ss >> cl.user;
 				ss >> cl.host;
 				ss >> cl.server;
-				ss >> cl.realname;
+				cl.realname = msg.trailing;
 			}
-			cout << "\tMSG: " << msg.cmd << " PARAMS: " << msg.params << endl;
-			cout << "\tUSER: " << cl.user << endl;
-			cout << "\tHOST: " << cl.host << endl;
-			cout << "\trealname: " << cl.realname << endl;
+			YEET setw(20) << "USER: " << cl.user ENDL;
+			YEET setw(20) << "HOST: " << cl.host ENDL;
+			YEET setw(20) << "SERVER: " << cl.server ENDL; // confusing
+			YEET setw(20) << "REALNAME: " << cl.realname ENDL;
 
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
@@ -213,10 +220,8 @@ void execute_cmd(Client &cl, string &cmd) {
 				fullname.append("!");
 				fullname.append(cl.user);
 				fullname.append("@");
-				fullname.append(cl.server);
+				fullname.append(cl.ip_addr);
 				cl.fullname = fullname;
-				cout << "\tCL NICK:" << cl.nick << endl;
-				cout << endl << "REALNAME: " << cl.realname << endl;
 				cl.registered = true;
 				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
 				response.append("001 ");
@@ -224,7 +229,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append(" :Welcome to the Internet Relay Network ");
 				response.append(cl.fullname);
 			} else {
-				cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
+				// cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
 			}
 			break;
 		case 3: // PRIVMSG
@@ -284,7 +289,7 @@ void execute_cmd(Client &cl, string &cmd) {
 		case 4: // JOIN
 			if (!cl.auth) {
 				response.append("451 ");
-				response.append(" * :You have not registered");
+				response.append(" * :You have not registered"); // * is nick
 				break;
 			}
 			if (msg.params.length()) {
@@ -326,7 +331,7 @@ void execute_cmd(Client &cl, string &cmd) {
 	}
 	if (response.length() > servername.length()) {
 		response.append("\r\n");
-		cout << "RESPONSE: " << response << endl;
+		YEET BOLDGREEN << setw(20) << "RESPONSE: " << response ENDL;
 		send(cl.socket, response.c_str(), response.length(), 0);
 		response.erase();
 	}
@@ -351,15 +356,6 @@ int main(void) {
 	int server_socket = get_server_socket();
 	fds[0].fd = server_socket;
 	fds[0].events = POLLIN;
-
-
-	// from here
-	// std::set<Client> empty;
-
-
-	// Client::channels.insert(std::pair<string, std::set<Client> >("#1", empty));
-	// Client test(200, "");
-	// Client::channels.at("#1").insert(test);
 
 	while (server_running) {
 		int poll_count = poll(fds, fd_count, -1);
@@ -388,7 +384,7 @@ int main(void) {
 					char ip_str[INET_ADDRSTRLEN];
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
 
-					cout << "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" << endl;
+					YEET "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" ENDL;
 					Client client(client_socket, ip_str);
 					connections.insert(std::pair<int, Client &>(client_socket, client));
 					fd_count++;
@@ -398,7 +394,7 @@ int main(void) {
 					int sz = 0;
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
-						cout << "client " << i << " at fd " <<  fds[i].fd << "quit." << endl;
+						YEET "client " << i << " at fd " <<  fds[i].fd << "quit." ENDL;
 						Client::client_list.erase(connections.at(fds[i].fd).nick);
 						close(fds[i].fd);
 						connections.erase(fds[i].fd);
@@ -406,7 +402,7 @@ int main(void) {
 					} else {
 						Client &cl = connections.at(fds[i].fd);
 						// parse message into command
-						cout << "received " << buffer << " from client " << i << " at fd " << fds[i].fd << endl;
+						YEET "\nRECVD FROM CLIENT " << i << " at fd " << fds[i].fd  << "\n" << BOLDBLUE << buffer ENDL;
 						string message(buffer);
 						if (cl.remainder.length()) {
 							message.insert(0, cl.remainder);
@@ -414,9 +410,9 @@ int main(void) {
 						if (!message.empty()) {
 							size_t idx = message.find("\r\n", 0);
 							while (idx != string::npos) {
-								// cout << "idx: " << idx << endl;
+								// YEET "idx: " << idx ENDL;
 								string cmd = message.substr(0, idx);
-								cout << "cmd: " << cmd << endl;
+								// YEET "cmd: " << cmd ENDL;
 
 								/**
 								 * TODO: execute command if valid

@@ -21,10 +21,19 @@
 # include <string>
 # include <cstring>
 # include <poll.h>
+# include "colours.hpp"
 
 using std::cout;
+using std::clog;
 using std::endl;
 using std::string;
+
+# ifndef DEBUG
+#  define DEBUG 0
+# endif
+
+# define YEET if (DEBUG) clog << BOLDBLACK <<
+# define ENDL << RESET << endl
 
 typedef struct addrinfo ai;
 
