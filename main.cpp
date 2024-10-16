@@ -50,6 +50,8 @@ class Client {
 		bool	auth;
 		bool	registered;
 
+		std::set<string> joined_channels;
+
 		static std::map<string, Client &> client_list;
 		static std::map<string, std::set<string> > channels;
 
@@ -262,9 +264,17 @@ void execute_cmd(Client &cl, string &cmd) {
 						std::set<string>::iterator it = Client::channels.at(recpt).begin();
 						while (it != Client::channels.at(recpt).end()) {
 							if (*it != cl.nick) {
-								send(Client::client_list.at(*it).socket, message.c_str(), message.length(), 0);
+								try {
+									int socket = Client::client_list.at(*it).socket;
+									send(socket, message.c_str(), message.length(), 0);
+								} catch (std::exception const & e) {
+									YEET BOLDYELLOW << "OOPSIE: ";
+									YEET BOLDYELLOW << e.what() ENDL;
+								}
+
 							}
 							++it;
+							YEET "looping" ENDL;
 						}
 					} else {
 						response.append("401 ");
@@ -287,6 +297,9 @@ void execute_cmd(Client &cl, string &cmd) {
 			}
 			break;
 		case 4: // JOIN
+		/**
+		 * TODO: validate chnl name i.e. params
+		*/
 			if (!cl.auth) {
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick
@@ -299,12 +312,14 @@ void execute_cmd(Client &cl, string &cmd) {
 						// user already in channel
 						break;
 					}
-					Client::channels.at(msg.params).insert(cl.nick);
+					Client::channels[msg.params].insert(cl.nick);
+					cl.joined_channels.insert(msg.params);
 				} else {
 					// channel doesnt exist
 					std::set<string> newchn;
 					newchn.insert(cl.nick);
 					Client::channels.insert(std::pair<string, std::set<string> >(msg.params, newchn));
+					cl.joined_channels.insert(msg.params);
 				}
 			} else {
 				// not enough params
@@ -362,6 +377,7 @@ int main(void) {
 		
 		for (size_t i = 0; i < fd_count; ++i) {
 			if (fds[i].revents & POLLIN) {
+				YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 				if (fds[i].fd == server_socket) {
 					// received new client connection,
 					// to be added to fds array
@@ -377,8 +393,13 @@ int main(void) {
 					sockaddr_in remote;
 					socklen_t len = sizeof remote;
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
-					fds[fd_count].fd = client_socket;
-					fds[fd_count].events = POLLIN;
+					
+					for (size_t j = 1; j <= fd_count; ++j) {
+						if (fds[j].fd == 0) {
+							fds[j].fd = client_socket; // <--- culprit
+							fds[j].events = POLLIN;
+						}
+					}
 
 					// Get client IP address
 					char ip_str[INET_ADDRSTRLEN];
@@ -388,6 +409,8 @@ int main(void) {
 					Client client(client_socket, ip_str);
 					connections.insert(std::pair<int, Client &>(client_socket, client));
 					fd_count++;
+					YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
+
 				}
 				else {
 					char buffer[1024] = {0};
@@ -395,8 +418,28 @@ int main(void) {
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
 						YEET "client " << i << " at fd " <<  fds[i].fd << "quit." ENDL;
-						if (connections.at(fds[i].fd).nick.length())
-							Client::client_list.erase(connections.at(fds[i].fd).nick);
+
+						/**
+						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
+						*/
+						Client cl = connections.at(fds[i].fd);
+						
+
+						if (cl.auth && cl.nick.length()) {
+							// remove from all channels
+							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
+								
+								try {
+									Client::channels[*it].erase(cl.nick);
+									YEET BOLDBLUE << "Removed " << cl.nick << " from " << *it ENDL;
+								}
+								catch (std::exception const & e) {
+									YEET BOLDRED << "Unable to remove " << cl.nick << " from " << *it ENDL;
+								}
+							}
+							// remove from nickname list
+							Client::client_list.erase(cl.nick);
+						}
 
 						// try {
 						// 	Client::client_list.erase(connections.at(fds[i].fd).nick);
@@ -404,9 +447,12 @@ int main(void) {
 						// catch (std::exception const & e) {
 						// 	std::cerr << e.what() << endl; // most likely no nick.
 						// }
+				
 						close(fds[i].fd);
 						connections.erase(fds[i].fd);
+						fds[i].fd = 0;
 						fd_count--;
+						YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 					} else {
 						Client &cl = connections.at(fds[i].fd);
 						// parse message into command
@@ -425,6 +471,7 @@ int main(void) {
 								/**
 								 * TODO: execute command if valid
 								 * before proceeding to next command
+								 * :DONE:
 								*/
 						
 								execute_cmd(cl, cmd);
