@@ -63,6 +63,10 @@ class Client {
 std::map<string, Client &> Client::client_list;
 std::map<string, std::set<string> > Client::channels;
 
+// store.readAllNicks() // read from json 
+
+// repo.getNicks() [1, 2, 3]
+
 class Message {
 	public:
 	Message(string raw) {
@@ -72,6 +76,10 @@ class Message {
 		 * 	ends with CRLF?
 		 * 	total validity check? max 2 colons? num spaces? etc
 		 * 
+		 *  actually unsure if completely nec to do,
+		 *  given IRC protocol expects messages of certain
+		 *  format, as long as not undefined or wonky behaviour.
+		 * 
 		 * */ 
 		if (raw.find_first_of(':') == 0) {
 			prefix = raw.substr(0, raw.find_first_of(' '));
@@ -79,8 +87,14 @@ class Message {
 		} else {
 			prefix = "";
 		}
-		cmd = raw.substr(0, raw.find_first_of(' '));
-		raw.erase(0, raw.find_first_of(' ') + 1);
+		size_t space_idx = raw.find_first_of(' ');
+		if (space_idx != string::npos) {
+			cmd = raw.substr(0, raw.find_first_of(' '));
+			raw.erase(0, raw.find_first_of(' ') + 1);
+		} else {
+			cmd = raw;
+			raw.erase(raw.begin(), raw.end());
+		}
 		
 		if (raw.length()) {
 			size_t trail_index = raw.find_first_of(':');
@@ -149,6 +163,9 @@ void execute_cmd(Client &cl, string &cmd) {
 			if (msg.params.length()) {
 				if (cl.registered == false) {
 					cl.auth = msg.params == PASSWD;
+					if (!cl.auth) {
+						response.append("464 * :Password incorrect");
+					}
 				} else {
 					// already registered
 					response.append("462 ");
@@ -164,6 +181,15 @@ void execute_cmd(Client &cl, string &cmd) {
 			break;
 		case 1: // NICK
 			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick
 				break;
 			}
 			if (msg.params.length()) {
@@ -174,6 +200,9 @@ void execute_cmd(Client &cl, string &cmd) {
 				} else {
 					cl.nick = msg.params;
 				}
+			} else {
+				response.append("431 :No nickname given");
+				break;
 			}
 			// cout << "\tNICK: " << cl.nick << endl;
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
@@ -199,6 +228,15 @@ void execute_cmd(Client &cl, string &cmd) {
 				// ONLY SINGLE SPACES
 				// <username> <hostname> <servername> :<realname>
 			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick
 				break;
 			}
 			if (msg.params.length() && msg.trailing.length()) {
@@ -279,9 +317,9 @@ void execute_cmd(Client &cl, string &cmd) {
 					} else {
 						response.append("401 ");
 						response.append(cl.nick);
-						// response.append(" :No such nick (");
+						response.append(" :No such nick (");
 						response.append(recpt);
-						// response.append(")");
+						response.append(")");
 					}
 				}
 				else {
@@ -297,10 +335,17 @@ void execute_cmd(Client &cl, string &cmd) {
 			}
 			break;
 		case 4: // JOIN
-		/**
-		 * TODO: validate chnl name i.e. params
-		*/
+			/**
+			 * TODO: validate chnl name i.e. params
+			*/
 			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick
 				break;
@@ -337,6 +382,13 @@ void execute_cmd(Client &cl, string &cmd) {
 			send(cl.socket, response.c_str(), response.length(), 0);
 			response.erase(response.begin(), response.end());
 
+			/**
+			 * MAY NEED TO DO FOR Netcat
+			 * Even though subject does not require QUIT command
+			 * good to do? maybe can differentiate between irssi clients
+			 * and nc client based on CAP LS first command
+			 * 
+			*/
 			// Client::client_list.erase(cl.nick);
 			// close(cl.socket);
 			// connections.erase(cl.socket);
@@ -352,11 +404,9 @@ void execute_cmd(Client &cl, string &cmd) {
 	}
 }
 
-//:localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>
+// RPL_001 welcome msg template
+// :localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>CRLF
 #define MAX_CONNS 100
-
-
-
 
 int main(void) {
 
@@ -375,7 +425,7 @@ int main(void) {
 	while (server_running) {
 		int poll_count = poll(fds, fd_count, -1);
 		
-		for (size_t i = 0; i < fd_count; ++i) {
+		for (size_t i = 0; i < MAX_CONNS; ++i) {
 			if (fds[i].revents & POLLIN) {
 				YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 				if (fds[i].fd == server_socket) {
@@ -396,12 +446,13 @@ int main(void) {
 					
 					for (size_t j = 1; j <= fd_count; ++j) {
 						if (fds[j].fd == 0) {
-							fds[j].fd = client_socket; // <--- culprit
+							fds[j].fd = client_socket; // <--- culprit. previously was fds[fd_count].
 							fds[j].events = POLLIN;
 						}
 					}
 
 					// Get client IP address
+					// for fun tbh
 					char ip_str[INET_ADDRSTRLEN];
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
 
@@ -421,10 +472,10 @@ int main(void) {
 
 						/**
 						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
+						 * FIXED!
 						*/
-						Client cl = connections.at(fds[i].fd);
+						Client cl = connections.at(fds[i].fd); // need to guard against SIGINT by checking server_running bool :(
 						
-
 						if (cl.auth && cl.nick.length()) {
 							// remove from all channels
 							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
@@ -450,7 +501,7 @@ int main(void) {
 				
 						close(fds[i].fd);
 						connections.erase(fds[i].fd);
-						fds[i].fd = 0;
+						fds[i].fd = 0; // setting to 0 as a signal that it can be used
 						fd_count--;
 						YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 					} else {
