@@ -12,7 +12,7 @@
 
 NAME = ircserv
 
-SRCS = main.cpp utils.cpp
+SRCS = main.cpp serverutils.cpp cmdutils.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(SRCS:.cpp=.d)
 
