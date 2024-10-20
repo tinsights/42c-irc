@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tjegades <tjegades@student.42singapor      +#+  +:+       +#+        */
+/*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/09/25 15:39:27 by tjegades          #+#    #+#             */
-/*   Updated: 2024/09/25 15:39:28 by tjegades         ###   ########.fr       */
+/*   Updated: 2024/10/20 14:35:59 by tinaes           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 
 #include "Client.hpp"
 #include "Message.hpp"
+#include "Channel.hpp"
 
 int		get_server_socket();
 void	convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize);
@@ -21,25 +22,26 @@ void 	execute_cmd(Client &cl, string &cmd);
 
 /**
  * seems insufficient for clean exit,
- * occassionally ctrl+c gives seggy.. investigate later
+ * occassionally ctrl+c gives memleaks.. investigate later
 */
 
 volatile sig_atomic_t server_running = 1;
 void handler(int sig) {
 	if (sig == SIGINT) {
-		server_running = false;
+		server_running = 0;
 	}
 }
 
 /**
- * Currently global cause idk who needs whhat
+ * Currently global cause idk who needs what
  * Eventually in either .cpp as static? or just regular private attr
  * 
  * or in Repo Class managing all data and events => atomic state changes.
+ * https://www.geeksforgeeks.org/repository-design-pattern/
  * */ 
 std::map<string, Client &> Client::client_list;
-std::map<string, std::set<string> > Client::channels;
-std::map<int, Client> connections;
+std::map<string, std::set<string> > Channel::channel_list; // change to channel name and channel instance
+std::map<int, Client> connections; // global for now.
 
 #define MAX_CONNS 100
 
@@ -58,12 +60,12 @@ int main(void) {
 	fds[0].events = POLLIN;
 
 	for (size_t i = 1; i < MAX_CONNS; ++i) {
-		fds[i].fd = -1; // unused state
+		fds[i].fd = -1; // available state
 	}
 
 
 	while (server_running) {
-		int poll_count = poll(fds, MAX_CONNS, -1); // changed to poll over whole range, for now.
+		int poll_count = poll(fds, MAX_CONNS, -1); // changed to poll over whole range, as opposed to till fd_count, for now.
 		
 		for (size_t i = 0; i < MAX_CONNS; ++i) { // changed to poll over whole range, for now.
 			if (fds[i].revents & POLLIN) {
@@ -82,16 +84,15 @@ int main(void) {
 					sockaddr_in remote;
 					socklen_t len = sizeof remote;
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
-					
+					// use first available pollfd in array:
 					for (size_t j = 1; j <= fd_count; ++j) {
 						if (fds[j].fd == 0) {
-							fds[j].fd = client_socket; // <--- culprit. previously was fds[fd_count].
+							fds[j].fd = client_socket; // <--- culprit of random seggies. previously was fds[fd_count].
 							fds[j].events = POLLIN;
 						}
 					}
-
 					// Get client IP address
-					// for fun tbh
+					// for fun tbh. this was AI gen code.
 					char ip_str[INET_ADDRSTRLEN];
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
 
@@ -100,7 +101,6 @@ int main(void) {
 					connections.insert(std::pair<int, Client &>(client_socket, client));
 					fd_count++;
 					YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
-
 				}
 				else {
 					char buffer[1024] = {0};
@@ -108,19 +108,17 @@ int main(void) {
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
 						YEET "client " << i << " at fd " <<  fds[i].fd << "quit." ENDL;
-
 						/**
 						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
 						 * FIXED!
 						*/
 						Client cl = connections.at(fds[i].fd); // need to guard against SIGINT by checking server_running bool :(
-						
-						if (cl.auth && cl.nick.length()) {
+						// dropping connection, check if fully registered in order to remove from "databases"
+						if (cl.registered && cl.nick.length()) {
 							// remove from all channels
 							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
-								
 								try {
-									Client::channels[*it].erase(cl.nick);
+									Channel::channel_list[*it].erase(cl.nick);
 									YEET BOLDBLUE << "Removed " << cl.nick << " from " << *it ENDL;
 								}
 								catch (std::exception const & e) {
@@ -134,45 +132,40 @@ int main(void) {
 						close(fds[i].fd);
 						connections.erase(fds[i].fd);
 						fds[i].fd = -1; // setting to -1 as a signal that it can be re-used
-						fd_count--;
+						fd_count--;		// do i need fd count anymore? idk
 						YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 					} else {
+						// retrieve Client instance
 						Client &cl = connections.at(fds[i].fd);
-						// parse message into command
+						
 						YEET "\nRECVD FROM CLIENT " << i << " at fd " << fds[i].fd  << "\n" << BOLDBLUE << buffer ENDL;
+						
+						// parse message into command
 						string message(buffer);
+						// reconstruct from remainder if present
 						if (cl.remainder.length()) {
 							message.insert(0, cl.remainder);
 						}
+						// check if message has CRLF
 						if (!message.empty()) {
 							size_t idx = message.find("\r\n", 0);
+
+							// potentially multiple CRLF commands in one "transmission"
 							while (idx != string::npos) {
-								// YEET "idx: " << idx ENDL;
 								string cmd = message.substr(0, idx);
-								// YEET "cmd: " << cmd ENDL;
-
-								/**
-								 * TODO: execute command if valid
-								 * before proceeding to next command
-								 * :DONE:
-								*/
-						
 								execute_cmd(cl, cmd);
-								// YEET "after exec cmd";
-
-								message.erase(0, idx + 2);
-								// cout << "message: " << message << endl;
-
+								message.erase(0, idx + 2); // +2 bc of crlf
 								idx = message.find("\r\n", 0);
 							}
+							// store remainder if present.
 							if (!message.empty()) {
 								cl.remainder = message;
 							} else if (cl.remainder.length()) {
 								cl.remainder.clear();
 							}
 						}
-
 					}
+					// reset
 					memset(buffer, 0, sizeof buffer);
 				}
 			}

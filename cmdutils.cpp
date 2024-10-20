@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   cmdutils.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tjegades <tjegades@student.42singapor      +#+  +:+       +#+        */
+/*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/17 15:43:21 by tjegades          #+#    #+#             */
-/*   Updated: 2024/10/17 15:43:22 by tjegades         ###   ########.fr       */
+/*   Updated: 2024/10/20 14:34:23 by tinaes           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 
 #include "Client.hpp"
 #include "Message.hpp"
+#include "Channel.hpp"
 
 
 #define NUM_CMDS 8
@@ -194,7 +195,7 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append("\r\n");
 						send(Client::client_list.at(recpt).socket, message.c_str(), message.length(), 0);
 						break;
-					} else if (Client::channels.find(recpt) != Client::channels.end()) { 
+					} else if (Channel::channel_list.find(recpt) != Channel::channel_list.end()) { 
 						// send to channel
 						string message;
 						message
@@ -205,8 +206,8 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append(" :")
 							.append(msg.trailing)
 							.append("\r\n");
-						std::set<string>::iterator it = Client::channels.at(recpt).begin();
-						while (it != Client::channels.at(recpt).end()) {
+						std::set<string>::iterator it = Channel::channel_list.at(recpt).begin();
+						while (it != Channel::channel_list.at(recpt).end()) {
 							if (*it != cl.nick) {
 								try {
 									int socket = Client::client_list.at(*it).socket;
@@ -257,19 +258,19 @@ void execute_cmd(Client &cl, string &cmd) {
 				break;
 			}
 			if (msg.params.length()) {
-				if (Client::channels.find(msg.params) != Client::channels.end()) {
+				if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
 					// channel currently exists
-					if (Client::channels.at(msg.params).find(cl.nick) != Client::channels.at(msg.params).end() ){
+					if (Channel::channel_list.at(msg.params).find(cl.nick) != Channel::channel_list.at(msg.params).end() ){
 						// user already in channel
 						break;
 					}
-					Client::channels[msg.params].insert(cl.nick);
+					Channel::channel_list[msg.params].insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
 				} else {
 					// channel doesnt exist
 					std::set<string> newchn;
 					newchn.insert(cl.nick);
-					Client::channels.insert(std::pair<string, std::set<string> >(msg.params, newchn));
+					Channel::channel_list.insert(std::pair<string, std::set<string> >(msg.params, newchn));
 					cl.joined_channels.insert(msg.params);
 				}
 			} else {

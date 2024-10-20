@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Message.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: tjegades <tjegades@student.42singapor      +#+  +:+       +#+        */
+/*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/17 15:21:21 by tjegades          #+#    #+#             */
-/*   Updated: 2024/10/17 15:21:21 by tjegades         ###   ########.fr       */
+/*   Updated: 2024/10/20 14:32:28 by tinaes           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -73,6 +73,7 @@ class Message {
 	string	trailing;
 	string	params;
 	bool	valid;
+	
 	private:
 
 };
