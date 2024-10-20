@@ -18,7 +18,7 @@
 
 class Channel {
 	public:
-		Channel(string name) : name(name) {};
+		Channel(string name) : name(name), opers(), users() {};
 		~Channel() {};
 
 		// eventually private, lazy to do getters/setters for now:

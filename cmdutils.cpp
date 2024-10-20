@@ -213,7 +213,7 @@ void execute_cmd(Client &cl, string &cmd) {
 									int socket = Client::client_list.at(*it).socket;
 									send(socket, message.c_str(), message.length(), 0);
 								} catch (std::exception const & e) {
-									YEET BOLDYELLOW << "OOPSIE: ";
+									YEET BOLDYELLOW << "OOPSIE: " << *it << " ";
 									YEET BOLDYELLOW << e.what() ENDL;
 								}
 
@@ -268,8 +268,9 @@ void execute_cmd(Client &cl, string &cmd) {
 					cl.joined_channels.insert(msg.params);
 				} else {
 					// channel doesnt exist
-					Channel newchnl(msg.params);
-					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, newchnl));
+					Channel *newchnl = new Channel(msg.params);
+					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, *newchnl));
+					newchnl->users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
 				}
 			} else {

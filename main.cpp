@@ -86,7 +86,7 @@ int main(void) {
 					int client_socket = accept(server_socket, reinterpret_cast<sockaddr *>(&remote), &len);
 					// use first available pollfd in array:
 					for (size_t j = 1; j <= fd_count; ++j) {
-						if (fds[j].fd == 0) {
+						if (fds[j].fd == -1) {
 							fds[j].fd = client_socket; // <--- culprit of random seggies. previously was fds[fd_count].
 							fds[j].events = POLLIN;
 						}
@@ -114,12 +114,11 @@ int main(void) {
 						*/
 						Client cl = connections.at(fds[i].fd); // need to guard against SIGINT by checking server_running bool :(
 						// dropping connection, check if fully registered in order to remove from "databases"
-						if (cl.registered && cl.nick.length()) {
+						if (cl.auth && cl.nick.length()) {
 							// remove from all channels
 							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
 								try {
-									Channel chn = Channel::channel_list.at(*it);
-									chn.users.erase(cl.nick);
+									Channel::channel_list.at(*it).users.erase(cl.nick);
 									YEET BOLDBLUE << "Removed " << cl.nick << " from " << *it ENDL;
 								}
 								catch (std::exception const & e) {
@@ -128,6 +127,8 @@ int main(void) {
 							}
 							// remove from nickname list
 							Client::client_list.erase(cl.nick);
+						} else {
+							YEET BOLDBLUE << cl.auth << " " << cl.nick ENDL;
 						}
 				
 						close(fds[i].fd);
