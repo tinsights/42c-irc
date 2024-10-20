@@ -206,8 +206,8 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append(" :")
 							.append(msg.trailing)
 							.append("\r\n");
-						std::set<string>::iterator it = Channel::channel_list.at(recpt).begin();
-						while (it != Channel::channel_list.at(recpt).end()) {
+						std::set<string>::iterator it = Channel::channel_list.at(recpt).users.begin();
+						while (it != Channel::channel_list.at(recpt).users.end()) {
 							if (*it != cl.nick) {
 								try {
 									int socket = Client::client_list.at(*it).socket;
@@ -260,17 +260,16 @@ void execute_cmd(Client &cl, string &cmd) {
 			if (msg.params.length()) {
 				if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
 					// channel currently exists
-					if (Channel::channel_list.at(msg.params).find(cl.nick) != Channel::channel_list.at(msg.params).end() ){
+					if (Channel::channel_list.at(msg.params).users.find(cl.nick) != Channel::channel_list.at(msg.params).users.end() ){
 						// user already in channel
 						break;
 					}
-					Channel::channel_list[msg.params].insert(cl.nick);
+					Channel::channel_list.at(msg.params).users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
 				} else {
 					// channel doesnt exist
-					std::set<string> newchn;
-					newchn.insert(cl.nick);
-					Channel::channel_list.insert(std::pair<string, std::set<string> >(msg.params, newchn));
+					Channel newchnl(msg.params);
+					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, newchnl));
 					cl.joined_channels.insert(msg.params);
 				}
 			} else {

@@ -18,15 +18,28 @@
 
 class Channel {
 	public:
-		Channel(string name);
-		~Channel();
+		Channel(string name) : name(name) {};
+		~Channel() {};
 
 		// eventually private, lazy to do getters/setters for now:
-		string name;
+		string name;			//chn name. todo: validation
 
-		static std::map<string, std::set<string> > channel_list;
+		std::set<string> opers; // nicks of users who are operator
+		std::set<string> users;
+
+		/**
+		 * TODO: all of the below
+		*/
+		// string passwd;
+		// string topic;
+
+		// bool 	invite_only;
+		// bool	topic_limit;
+		// size_t	user_limit; // default to high number instead of toggling switch
+
+		static std::map<string, Channel & > channel_list;
 	private:
-	
+		Channel() {};
 };
 
 

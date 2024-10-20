@@ -44,7 +44,7 @@ class Client {
 		std::set<string> joined_channels;
 
 		static std::map<string, Client &> client_list;			// currently "global"
-		static std::map<string, std::set<string> > channels;	// likely will be refactored
+		// static std::map<string, std::set<string> > channels;	// likely will be refactored
 
 	private:
 		Client() {};

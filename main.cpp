@@ -33,14 +33,14 @@ void handler(int sig) {
 }
 
 /**
- * Currently global cause idk who needs what
+ * Currently "global" cause idk who needs what
  * Eventually in either .cpp as static? or just regular private attr
  * 
  * or in Repo Class managing all data and events => atomic state changes.
  * https://www.geeksforgeeks.org/repository-design-pattern/
  * */ 
 std::map<string, Client &> Client::client_list;
-std::map<string, std::set<string> > Channel::channel_list; // change to channel name and channel instance
+std::map<string, Channel & > Channel::channel_list; // change to channel name and channel instance
 std::map<int, Client> connections; // global for now.
 
 #define MAX_CONNS 100
@@ -60,7 +60,7 @@ int main(void) {
 	fds[0].events = POLLIN;
 
 	for (size_t i = 1; i < MAX_CONNS; ++i) {
-		fds[i].fd = -1; // available state
+		fds[i].fd = -1; // fd available state
 	}
 
 
@@ -118,7 +118,8 @@ int main(void) {
 							// remove from all channels
 							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
 								try {
-									Channel::channel_list[*it].erase(cl.nick);
+									Channel chn = Channel::channel_list.at(*it);
+									chn.users.erase(cl.nick);
 									YEET BOLDBLUE << "Removed " << cl.nick << " from " << *it ENDL;
 								}
 								catch (std::exception const & e) {
