@@ -40,18 +40,25 @@ void handler(int sig) {
  * https://www.geeksforgeeks.org/repository-design-pattern/
  * */ 
 std::map<string, Client &> Client::client_list;
-std::map<string, Channel & > Channel::channel_list; // change to channel name and channel instance
+std::map<string, Channel & > Channel::channel_list;
 std::map<int, Client> connections; // global for now.
 
 #define MAX_CONNS 100
 
 int main(void) {
 
+	/**
+	 * Cleanly exit when ctrl+c server
+	 * TODO: clear heap memory (currently Channel instances are on heap)
+	*/
 	struct sigaction sa;
 	memset(&sa, 0, sizeof sa);
 	sa.sa_handler = handler;
 	sigaction(SIGINT, &sa, NULL);
 
+	/* -------------------------------------------------------------------------- */
+	/*                            Server and Poll Init                            */
+	/* -------------------------------------------------------------------------- */
 	size_t fd_count = 1;
 	struct pollfd fds[MAX_CONNS];
 	memset(fds, 0, sizeof fds);
@@ -63,15 +70,16 @@ int main(void) {
 		fds[i].fd = -1; // fd available state
 	}
 
-
 	while (server_running) {
 		int poll_count = poll(fds, MAX_CONNS, -1); // changed to poll over whole range, as opposed to till fd_count, for now.
 		
 		for (size_t i = 0; i < MAX_CONNS; ++i) { // changed to poll over whole range, for now.
 			if (fds[i].revents & POLLIN) {
 				if (fds[i].fd == server_socket) {
-					// received new client connection,
-					// to be added to fds array
+					/* -------------------------------------------------------------------------- */
+					/*                              Accept New Client                             */
+					/* -------------------------------------------------------------------------- */
+
 					/**
 					 * int accept(int s, struct sockaddr *addr, socklen_t *addrlen)
 					 * 
@@ -103,16 +111,23 @@ int main(void) {
 					YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 				}
 				else {
+
+					/* -------------------------------------------------------------------------- */
+					/*                     Receive, Parse and Process Message                     */
+					/* -------------------------------------------------------------------------- */
+
 					char buffer[1024] = {0};
 					int sz = 0;
 					sz = recv(fds[i].fd, buffer, sizeof(buffer), 0);
 					if (sz <= 0) {
+						// Client quit
+						
 						YEET "client " << i << " at fd " <<  fds[i].fd << "quit." ENDL;
 						/**
 						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
 						 * FIXED!
 						*/
-						Client cl = connections.at(fds[i].fd); // need to guard against SIGINT by checking server_running bool :(
+						Client cl = connections.at(fds[i].fd); // may need to guard against SIGINT by checking server_running bool :(
 						// dropping connection, check if fully registered in order to remove from "databases"
 						if (cl.auth && cl.nick.length()) {
 							// remove from all channels

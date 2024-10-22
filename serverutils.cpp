@@ -82,6 +82,8 @@ int get_server_socket() {
 	freeaddrinfo(res);
 	return server_socket;
 }
+
+/* AI generated, was having fun, probably dont need */
 #include <cstdio>
 void convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize) {
 	snprintf(buffer, bufferSize, "%u.%u.%u.%u", 

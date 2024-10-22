@@ -34,7 +34,7 @@
 # include <iomanip>
 # include <sstream>
 # include <string>
-# include <cstring> // um, damn i should really keep track
+# include <cstring> // um, damn i should really keep track. why do i need this?
 # include "colours.hpp"
 
 using std::cout;

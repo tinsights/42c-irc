@@ -36,6 +36,8 @@ class Message {
 		 *  format, as long as not undefined or wonky behaviour.
 		 * 
 		 * */ 
+
+		/* probably better with a proper ft_split */
 		if (raw.find_first_of(':') == 0) {
 			prefix = raw.substr(0, raw.find_first_of(' '));
 			raw.erase(0, raw.find_first_of(' ') + 1);
@@ -66,7 +68,7 @@ class Message {
 	};
 	~Message() {};
 
-	// eventually private.. i think?
+	// eventually private, i think?
 	string	input;
 	string	cmd;
 	string	prefix;

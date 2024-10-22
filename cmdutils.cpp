@@ -16,8 +16,7 @@
 #include "Message.hpp"
 #include "Channel.hpp"
 
-
-#define NUM_CMDS 8
+#define NUM_CMDS 9
 #define PASSWD "hitchhiker"
 
 // RPL_001 welcome msg template
@@ -25,24 +24,21 @@
 
 void execute_cmd(Client &cl, string &cmd) {
 	Message msg(cmd);
-	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "MODE", "PING"};
+	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "MODE", "PING"};
 	int index = -1;
 	for (int i = 0; i < NUM_CMDS; ++i) {
 		if (msg.cmd == cmds[i]) {
-			// cout << cmds[i] << endl;
-			// string response = "Received: ";
-			// response.append(cmd);
-			// send(cl.socket, response.c_str(), response.length(), 0);
 			index = i;
 			break;
 		}
 	}
 	// upstream msg validity check??
-	string servername = ":ft_irc ";
+	string servername = ":ft_irc "; // thats us baby. maybe can use gethostname or get our ip addr
 	string	response = servername;
 
 	switch (index) {
 		case -1:
+			// bad cmd
 			response.append("421 ");
 			if (cl.nick.length())
 				response.append(cl.nick);
@@ -52,7 +48,13 @@ void execute_cmd(Client &cl, string &cmd) {
 			response.append(msg.cmd); 	
 			response.append(" :Unknown command");
 			break;
-		case 0: // PASS
+		case 0:
+			/** PASS
+			 * Potential replies:
+			 * 		ERR_NEEDMOREPARAMS 		461
+			 * 		ERR_ALREADYREGISTERED 	462
+			 * 
+			*/
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
 
 			if (msg.params.length()) {
@@ -92,7 +94,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick
+				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
 			}
 			if (msg.params.length()) {
@@ -107,7 +109,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append("431 :No nickname given");
 				break;
 			}
-			// cout << "\tNICK: " << cl.nick << endl;
+			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
 				fullname.append(cl.nick);
@@ -129,6 +131,7 @@ void execute_cmd(Client &cl, string &cmd) {
 		case 2: // USER
 				/**
 				 * TODO: 
+				 * - write more comments for xf
 				 * - upstream format check?
 				 * - valid names
 				 * format: <username> <hostname> <servername> :<realname>
@@ -143,7 +146,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick
+				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
 			}
 			if (msg.params.length() && msg.trailing.length()) {
@@ -158,9 +161,10 @@ void execute_cmd(Client &cl, string &cmd) {
 			}
 			YEET setw(20) << "USER: " << cl.user ENDL;
 			YEET setw(20) << "HOST: " << cl.host ENDL;
-			YEET setw(20) << "SERVER: " << cl.server ENDL; // confusing
+			YEET setw(20) << "SERVER: " << cl.server ENDL; // confusing. server is us
 			YEET setw(20) << "REALNAME: " << cl.realname ENDL;
 
+			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
 				fullname.append(cl.nick);
@@ -180,6 +184,11 @@ void execute_cmd(Client &cl, string &cmd) {
 			}
 			break;
 		case 3: // PRIVMSG
+				/**
+				 * TODO: 
+				 * - write more comments for xf
+				 * 
+				*/
 			if (msg.params.length()) {
 				if (msg.params.find_first_of(' ') != string::npos) {
 					string recpt = msg.params.substr(0, msg.params.find_first_of(' '));
@@ -216,7 +225,6 @@ void execute_cmd(Client &cl, string &cmd) {
 									YEET BOLDYELLOW << "OOPSIE: " << *it << " ";
 									YEET BOLDYELLOW << e.what() ENDL;
 								}
-
 							}
 							++it;
 							YEET "looping" ENDL;
@@ -242,8 +250,22 @@ void execute_cmd(Client &cl, string &cmd) {
 			}
 			break;
 		case 4: // JOIN
-			/**
-			 * TODO: validate chnl name i.e. params
+			/** 
+			 *  Potential replies:
+			 * 		ERR_NEEDMOREPARAMS	461
+			 * 		ERR_BADCHANMASK 	476 <-- channel format wrong
+			 * 		ERR_BADCHANNELKEY 	475 <-- wrong channel password, if req
+			 * 		ERR_INVITEONLYCHAN	473
+			 * 
+			 * 		RPL_TOPIC 332 && RPL_NAMEREPLY 353 <-- on success
+			 * 
+			 *  TODO:
+			 * 		- validate chnl name i.e. params BADCHANMASK
+			 * 		- channel restrictions i.e. BADCHANNELKEY / INVITEONLYCHAN
+			 * 		- send proper reply to all to announce client joined channel
+			 * 		- send back RPL_TOPIC and RPL_NAMEREPLY
+			 * 		
+			 * 
 			*/
 			if (!cl.auth) {
 				/**
@@ -254,7 +276,7 @@ void execute_cmd(Client &cl, string &cmd) {
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick
+				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
 			}
 			if (msg.params.length()) {
@@ -283,7 +305,10 @@ void execute_cmd(Client &cl, string &cmd) {
 			cout << cl.nick << " has joined " << msg.params << endl;
 			break;
 		case 5: // QUIT
-				// :tj!~tj@203.149.201.178 QUIT :Client Quit
+			/** 
+			 * Response:
+			 * 	:<nick>!<user>>@<host> QUIT :Client Quit
+			*/
 			response.append(servername);
 			response.append(" :Closing Link: (Client Quit) ");
 			send(cl.socket, response.c_str(), response.length(), 0);
@@ -300,6 +325,44 @@ void execute_cmd(Client &cl, string &cmd) {
 			// close(cl.socket);
 			// connections.erase(cl.socket);
 			break;
+		case 6: // KICK (in progress)	
+			/**
+			 *  Potential replies:
+			 * 		ERR_NEEDMOREPARAMS 461
+			 * 		ERR_NOSUCHCHANNEL 403
+			 * 		ERR_BADCHANMASK  476 <--> bad channel format
+			 * 		ERR_NOTONCHANNEL 442
+			 * 		ERR_CHANOPRIVSNEEDED 482 <-- not operator
+			*/
+			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+			if (msg.params.length()) { // <channel> <user>
+				/** TODO: 
+				 * 	- check if both channel and user present in params (netcat proofing)
+				 * 	- check if channel legit
+				 *  - check if user is in channel and oper
+				 *  - kick! 
+				*/
+
+			} else {
+				// not enough params
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" KICK :Not enough parameters");
+				break;
+			}
+		// currently ignore PING and MODE that are automatically sent by irssi
+		// so as to avoid confusing "PING: unknown command"	 on client side
 		default:
 			break;
 	}
