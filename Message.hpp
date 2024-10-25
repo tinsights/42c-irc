@@ -6,7 +6,7 @@
 /*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/17 15:21:21 by tjegades          #+#    #+#             */
-/*   Updated: 2024/10/20 14:32:28 by tinaes           ###   ########.fr       */
+/*   Updated: 2024/10/21 12:45:26 by tinaes           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,6 +60,9 @@ class Message {
 				trailing = raw.substr(trail_index + 1);
 			}
 		}
+
+		/* can be operator overload instead
+			then just YEET msg */
 		YEET BOLDRED << setw(20) << "Prefix: " << prefix ENDL;
 		YEET BOLDRED << setw(20) << "Cmd: " << cmd ENDL;
 		YEET BOLDRED << setw(20) << "Params: " << params ENDL;
@@ -77,6 +80,7 @@ class Message {
 	bool	valid;
 	
 	private:
+	Message();
 
 };
 

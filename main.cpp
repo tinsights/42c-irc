@@ -6,7 +6,7 @@
 /*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/09/25 15:39:27 by tjegades          #+#    #+#             */
-/*   Updated: 2024/10/20 14:35:59 by tinaes           ###   ########.fr       */
+/*   Updated: 2024/10/25 13:36:00 by tinaes           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -87,7 +87,7 @@ int main(void) {
 					 * it fills sockaddr *addr with information about the connecting client, 
 					 * and returns a new socket FD that can be used for send() and recv()
 					 * 
-					 * TODO: error checking (i.e. check return value)
+					 * TODO: error checking (i.e. check return value, exit gracefully, etc..)
 					*/
 					sockaddr_in remote;
 					socklen_t len = sizeof remote;
@@ -100,7 +100,7 @@ int main(void) {
 						}
 					}
 					// Get client IP address
-					// for fun tbh. this was AI gen code.
+					// for fun tbh. this was AI gen function.
 					char ip_str[INET_ADDRSTRLEN];
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
 
