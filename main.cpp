@@ -170,7 +170,10 @@ int main(void) {
 							// potentially multiple CRLF commands in one "transmission"
 							while (idx != string::npos) {
 								string cmd = message.substr(0, idx);
-								execute_cmd(cl, cmd);
+								/* -------------------------------------------------------------------------- */
+								/*                               EXECUTE COMMAND                              */
+								/* -------------------------------------------------------------------------- */
+								execute_cmd(cl, cmd); <--- big
 								message.erase(0, idx + 2); // +2 bc of crlf
 								idx = message.find("\r\n", 0);
 							}

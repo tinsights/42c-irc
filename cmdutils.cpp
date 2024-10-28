@@ -285,6 +285,7 @@ void execute_cmd(Client &cl, string &cmd) {
 					// channel currently exists
 					if (Channel::channel_list.at(msg.params).users.find(cl.nick) != Channel::channel_list.at(msg.params).users.end() ){
 						// user already in channel
+						// should send err msg
 						break;
 					}
 					Channel::channel_list.at(msg.params).users.insert(cl.nick);
