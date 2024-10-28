@@ -33,7 +33,8 @@ class Message {
 		 * 
 		 *  actually unsure if completely nec to do,
 		 *  given IRC protocol expects messages of certain
-		 *  format, as long as not undefined or wonky behaviour.
+		 *  format, as long as not undefined or wonky behaviour,
+		 * 	but may need to make it netcat-proof
 		 * 
 		 * */ 
 

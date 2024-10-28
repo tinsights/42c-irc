@@ -16,7 +16,7 @@
 #include "Message.hpp"
 #include "Channel.hpp"
 
-#define NUM_CMDS 9
+#define NUM_CMDS 11
 #define PASSWD "hitchhiker"
 
 // RPL_001 welcome msg template
@@ -24,7 +24,7 @@
 
 void execute_cmd(Client &cl, string &cmd) {
 	Message msg(cmd);
-	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "MODE", "PING"};
+	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "MODE", "PING", "TOPIC", "INVITE"};
 	int index = -1;
 	for (int i = 0; i < NUM_CMDS; ++i) {
 		if (msg.cmd == cmds[i]) {
@@ -32,6 +32,7 @@ void execute_cmd(Client &cl, string &cmd) {
 			break;
 		}
 	}
+
 	// upstream msg validity check??
 	string servername = ":ft_irc "; // thats us baby. maybe can use gethostname or get our ip addr
 	string	response = servername;
@@ -361,13 +362,31 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append(" KICK :Not enough parameters");
 				break;
 			}
-		// currently ignore PING and MODE that are automatically sent by irssi
-		// so as to avoid confusing "PING: unknown command"	 on client side
+		case 9: // TOPIC
+			/**
+			 * TODO: Implement TOPIC command functionality
+			 * - Check if user is in a channel
+			 * - Set the topic for the channel
+			 * - Respond with appropriate messages
+			 */
+			break;
+		case 10: // INVITE
+			/**
+			 * TODO: Implement INVITE command functionality
+			 * - Check if user is in a channel
+			 * - Check if the invited user exists and is not already in the channel
+			 * - Send an invitation to the user
+			 * - Respond with appropriate messages
+			 */
+			break;
 		default:
+			// Existing cases...
+			// currently ignore PING and MODE that are automatically sent by irssi
+			// so as to avoid confusing "PING: unknown command"	 on client side
 			break;
 	}
 	if (response.length() > servername.length()) {
-		response.append("\r\n");
+		response.append("\r\n"); // if we have a response class, response.send(Client & cl)) can append CRLF
 		YEET BOLDGREEN << setw(20) << "RESPONSE: " << response ENDL;
 		send(cl.socket, response.c_str(), response.length(), 0);
 		response.erase();
