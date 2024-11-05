@@ -44,6 +44,7 @@ using std::endl;
 using std::setw;
 
 using std::string;
+using std::vector;
 
 /* Forward declaration.. can be removed later w proper .cpp class files*/
 class Client;
