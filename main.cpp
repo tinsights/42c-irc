@@ -41,7 +41,7 @@ void handler(int sig) {
  * */ 
 std::map<string, Client &> Client::client_list;
 std::map<string, Channel & > Channel::channel_list;
-std::map<int, Client> connections; // global for now.
+std::map<int, Client &> Client::connections; // global for now.
 
 #define MAX_CONNS 100
 
@@ -105,8 +105,8 @@ int main(void) {
 					convertInAddrToString(remote.sin_addr, ip_str, sizeof(ip_str));
 
 					YEET "client " << fd_count << " at fd " << fds[fd_count].fd << " and ip " << ip_str << " joined!" ENDL;
-					Client client(client_socket, ip_str);
-					connections.insert(std::pair<int, Client &>(client_socket, client));
+					Client *client = new Client(client_socket, ip_str);
+					Client::connections.insert(std::pair<int, Client &>(client_socket, *client));
 					fd_count++;
 					YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 				}
@@ -127,14 +127,26 @@ int main(void) {
 						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
 						 * FIXED!
 						*/
-						Client cl = connections.at(fds[i].fd); // may need to guard against SIGINT by checking server_running bool :(
+						Client & cl = Client::connections.at(fds[i].fd); // may need to guard against SIGINT by checking server_running bool :(
 						// dropping connection, check if fully registered in order to remove from "databases"
 						if (cl.auth && cl.nick.length()) {
 							// remove from all channels
 							for (std::set<string>::iterator it = cl.joined_channels.begin(); it != cl.joined_channels.end(); ++it) {
 								try {
-									Channel::channel_list.at(*it).users.erase(cl.nick);
+									Channel & chnl = Channel::channel_list.at(*it);
+									chnl.users.erase(cl.nick);
+									chnl.opers.erase(cl.nick);
+									chnl.invited.erase(cl.nick);
 									YEET BOLDBLUE << "Removed " << cl.nick << " from " << *it ENDL;
+									YEET BOLDBLUE << "Curr chnl size: " << chnl.users.size() ENDL;
+									if (chnl.users.size() == 0) {
+										YEET BOLDYELLOW << "Channel " << chnl.name << " is empty. Deleting." ENDL;
+										Channel::channel_list.erase(*it);
+										delete &chnl;
+									}
+									else if (chnl.opers.empty()) {
+										chnl.opers.insert(*chnl.users.begin());
+									}
 								}
 								catch (std::exception const & e) {
 									YEET BOLDRED << "Unable to remove " << cl.nick << " from " << *it ENDL;
@@ -142,18 +154,19 @@ int main(void) {
 							}
 							// remove from nickname list
 							Client::client_list.erase(cl.nick);
+							delete &cl;
 						} else {
 							YEET BOLDBLUE << cl.auth << " " << cl.nick ENDL;
 						}
 				
 						close(fds[i].fd);
-						connections.erase(fds[i].fd);
+						Client::connections.erase(fds[i].fd);
 						fds[i].fd = -1; // setting to -1 as a signal that it can be re-used
 						fd_count--;		// do i need fd count anymore? idk
 						YEET BOLDRED << "FD COUNT: " << fd_count ENDL;
 					} else {
 						// retrieve Client instance
-						Client &cl = connections.at(fds[i].fd);
+						Client &cl = Client::connections.at(fds[i].fd);
 						
 						YEET "\nRECVD FROM CLIENT " << i << " at fd " << fds[i].fd  << "\n" << BOLDBLUE << buffer ENDL;
 						
@@ -183,6 +196,7 @@ int main(void) {
 							// store remainder if present.
 							if (!message.empty()) {
 								cl.remainder = message;
+								YEET BOLDYELLOW << "REMAINDER: " << cl.remainder ENDL;
 							} else if (cl.remainder.length()) {
 								cl.remainder.clear();
 							}
@@ -197,10 +211,17 @@ int main(void) {
 			break;
 	}
 
-	cout << server_socket << endl;
-	cout << fd_count << endl;
-	cout << "EXITING" << endl;
+	YEET server_socket ENDL;
+	YEET fd_count ENDL;
+	YEET "EXITING" ENDL;
 	
-	for (size_t i = 0; i < fd_count; ++i)
-		close(fds[i].fd);
+	for (std::map<int, Client &>::iterator it = Client::connections.begin(); it != Client::connections.end(); ++it) {
+		delete &it->second;
+		close(it->first);
+	}
+	close(server_socket);
+	for (std::map<string, Channel&>::iterator it = Channel::channel_list.begin(); it != Channel::channel_list.end(); ++it) {
+		delete &it->second;
+	}
+
 }

@@ -19,7 +19,7 @@
 class Channel {
 	public:
 		Channel(string name) 
-			: name(name), opers(), users(), passwd(""), topic(""), invite_only(false), topic_protected(true), passwd_protected(false), user_limit(0) {};
+			: name(name), opers(), users(), invited(), passwd(""), topic(""), invite_only(false), topic_protected(true), passwd_protected(false), user_limit(0) {};
 		~Channel() {};
 
 		// eventually private, lazy to do getters/setters for now:
@@ -27,6 +27,7 @@ class Channel {
 
 		std::set<string> opers; // nicks of users who are operator
 		std::set<string> users;
+		std::set<string> invited; // nicks of users who are invited	
 
 		/**
 		 * TODO: all of the below

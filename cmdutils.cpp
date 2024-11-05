@@ -159,6 +159,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				ss >> cl.user;
 				ss >> cl.host;
 				ss >> cl.server;
+				cl.realname.clear();
 				cl.realname = msg.trailing;
 			} else {
 				// ERR_NEEDMOREPARAMS	461
@@ -166,11 +167,6 @@ void execute_cmd(Client &cl, Message & msg) {
 					.append(cl.nick)
 					.append(" USER :Not enough parameters");
 			}
-			YEET setw(20) << "USER: " << cl.user ENDL;
-			YEET setw(20) << "HOST: " << cl.host ENDL;
-			YEET setw(20) << "SERVER: " << cl.server ENDL; // confusing. server is us
-			YEET setw(20) << "REALNAME: " << cl.realname ENDL;
-
 			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
@@ -179,7 +175,7 @@ void execute_cmd(Client &cl, Message & msg) {
 					.append(cl.user)
 					.append("@")
 					.append(cl.ip_addr);
-
+				cl.fullname.clear();
 				cl.fullname = fullname;
 				cl.registered = true;
 
@@ -270,7 +266,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		RPL_TOPIC 332 && RPL_NAMEREPLY 353 <-- on success
 			 * 		DONE:	:server 353 NICK = CHNLNAME :list of nicknames // honestly what is the equals sign? idk im following liberachat
 			 *	 			:server 366 NICK CHNLNAME :End of /NAMES list.T
-			 				TODO: add @ prefix for ops
+			 				add @ prefix for ops
 			 * 
 			 *  TODO:
 			 * 		- validate chnl name i.e. params BADCHANMASK
@@ -279,14 +275,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		 - send back RPL_TOPIC and RPL_NAMEREPLY
 			 * 		
 			*/
-			if (!cl.auth) {
-				/**
-				 * Unsure if should send anything back (cybersec: can guess pw)
-				 * but want to differentiate between clients / server hanging
-				 * and other incorrect behaviour
-				 * 
-				 * i.e. every message should have some sort of response. good for debugging
-				*/
+			if (!cl.registered) {
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
@@ -300,6 +289,45 @@ void execute_cmd(Client &cl, Message & msg) {
 						// user already in channel
 						// should send err msg
 						// apparently IRC servers do nothing here
+						break;
+					}
+					else if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
+						// user not invited
+						response.append("473 ");
+						response.append(cl.nick);
+						response.append(" ");
+						response.append(msg.params);
+						response.append(" :Cannot join channel (+i)");
+						break;
+					}
+					else if (chnl.passwd_protected) {
+						if (msg.param_list.size() < 2) {
+							// channel has password
+							// send ERR_BADCHANNELKEY
+							response.append("475 ");
+							response.append(cl.nick);
+							response.append(" ");
+							response.append(msg.params);
+							response.append(" :Cannot join channel, requires password (+k)");
+							break;
+						} else if (msg.param_list[1] != chnl.passwd) {
+							// wrong password
+							response.append("464 ");
+							response.append(cl.nick);
+							response.append(" ");
+							response.append(msg.params);
+							response.append(" :Password incorrect.");
+							break;
+						}
+						break;
+					}
+					else if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
+						// channel is full
+						response.append("471 ");
+						response.append(cl.nick);
+						response.append(" ");
+						response.append(msg.params);
+						response.append(" :Cannot join channel, channel is full.");
 						break;
 					}
 					chnl.users.insert(cl.nick);
@@ -416,33 +444,71 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		ERR_NOTONCHANNEL 442
 			 * 		ERR_CHANOPRIVSNEEDED 482 <-- not operator
 			*/
-			if (!cl.auth) {
-				/**
-				 * Unsure if should send anything back (cybersec: can guess pw)
-				 * but want to differentiate between clients / server hanging
-				 * and other incorrect behaviour
-				 * 
-				 * i.e. every message should have some sort of response. good for debugging
-				*/
+			if (!cl.registered) {
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
 			}
-			if (msg.params.length()) { // <channel> <user>
-				/** TODO: 
-				 * 	- check if both channel and user present in params (netcat proofing)
-				 * 	- check if channel legit
-				 *  - check if user is in channel and oper
-				 *  - kick! 
-				*/
-
-			} else {
+			else if (msg.param_list.size() < 2) { // <channel> <user>
 				// not enough params
 				response.append("461 ");
 				response.append(cl.nick);
 				response.append(" KICK :Not enough parameters");
 				break;
 			}
+			else {// get chnl and user from params
+				string chnlname = msg.param_list[0];
+				string user = msg.param_list[1];
+				// check if channel exists
+				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
+					response.append("403 ");
+					response.append(cl.nick);
+					response.append(" :No such channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(chnlname);
+				// check if this client is a chnl operator
+				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
+					response.append("482 ");
+					response.append(cl.nick);
+					response.append(" " + chnlname);
+					response.append(" :You're not a channel operator");
+					break;
+				}
+				// check if user is in channel
+				if (chnl.users.find(user) == chnl.users.end()) {
+					response.append("442 ");
+					response.append(cl.nick);
+					response.append(" ");
+					response.append(user);
+					response.append(" :User is not in this channel");
+					break;
+				}
+				
+				// send kick message to user
+				string kickmsg = ":";
+				kickmsg.append(cl.fullname)
+						.append(" KICK ")
+						.append(chnlname)
+						.append(" ")
+						.append(user);
+				if (msg.trailing.length())
+						kickmsg.append(msg.trailing);
+				kickmsg.append("\r\n");
+				// send to all users in channel
+				std::set<string>::iterator it = chnl.users.begin();
+				while (it != chnl.users.end()) {
+					send(Client::client_list.at(*it).socket, kickmsg.c_str(), kickmsg.length(), 0);
+					++it;
+				}
+				// kick user
+				chnl.users.erase(user);
+				// if user is in invite list, remove
+				chnl.invited.erase(user);
+				// if user is oper, remove
+				chnl.opers.erase(user);
+			}
+			break;
 		case 7: // TOPIC
 			/**
 			 * TODO: Implement TOPIC command functionality
@@ -453,14 +519,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			// set topic if user is oper
 			// send topic to all users in channel
 			// send RPL_TOPIC to user
-			if (!cl.auth) {
-				/**
-				 * Unsure if should send anything back (cybersec: can guess pw)
-				 * but want to differentiate between clients / server hanging
-				 * and other incorrect behaviour
-				 * 
-				 * i.e. every message should have some sort of response. good for debugging
-				*/
+			if (!cl.registered) {
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
@@ -522,6 +581,7 @@ void execute_cmd(Client &cl, Message & msg) {
 						// ERR_CHANOPRIVSNEEDED 482
 						response.append("482 ");
 						response.append(cl.nick);
+						response.append(" " + chnl.name);
 						response.append(" :You're not a channel operator");
 					}
 				} 
@@ -541,6 +601,49 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * - Send an invitation to the user
 			 * - Respond with appropriate messages
 			 */
+			if (!cl.registered) {
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+			else if (msg.param_list.size() < 2) {
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" INVITE :Not enough parameters");
+				break;
+			} else {
+				// get chnl and user from params
+				string chnlname = msg.param_list[1];
+				string user = msg.param_list[0];
+				// check if channel exists
+				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
+					response.append("403 ");
+					response.append(cl.nick);
+					response.append(" :No such channel");
+					break;
+				}
+				// check if user is in server
+				if (Client::client_list.find(user) == Client::client_list.end()) {
+					response.append("401 ");
+					response.append(cl.nick);
+					response.append(" ");
+					response.append(user);
+					response.append(" :No such nick/channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(chnlname);
+				// check if user is in channel
+				if (chnl.users.find(user) != chnl.users.end()) {
+					response.append("443 ");
+					response.append(cl.nick);
+					response.append(" ");
+					response.append(user);
+					response.append(" :is already on channel");
+					break;
+				}
+				// send invite
+				chnl.invited.insert(user);
+			}
 			break;
 		case 9: //MODE
 			/**
@@ -551,7 +654,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * - Respond with appropriate messages
 			 */
 			// get chnl and mode from params
-			if (!cl.auth) {
+			if (!cl.registered) {
 				response.append("451 ");
 				response.append(" * :You have not registered"); // * is nick placeholder
 				break;
@@ -564,6 +667,10 @@ void execute_cmd(Client &cl, Message & msg) {
 			} else {
 				// split params into channel and mode
 				string chnlname = msg.param_list[0];
+				// if received user mode command as per irssi auto, ignore
+				if (Client::client_list.find(chnlname) != Client::client_list.end()) {
+					break;
+				}
 				string modes = msg.param_list[1];
 				if (modes.length() == 0) {
 					response.append("461 ")
@@ -583,6 +690,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
 					response.append("482 ")
 							.append(cl.nick)
+							.append(" " + chnlname)
 							.append(" :You're not a channel operator");
 					break;
 				}
@@ -644,13 +752,22 @@ void execute_cmd(Client &cl, Message & msg) {
 							// check if next param is present
 							if (msg.param_list.size() > 2) {
 								string oper = msg.param_list[2];
-								if (chnl.users.find(oper) != chnl.users.end()) {
+								if (chnl.opers.find(oper) != chnl.opers.end()) {
+									response.append("441 ")
+											.append(cl.nick)
+											.append(" ")
+											.append(oper)
+											.append(" :They are already an operator");
+									break;
+								}
+								else if (chnl.users.find(oper) != chnl.users.end()) {
 									chnl.opers.insert(oper);
 									if (!prefixed) {
 										mode_changes.append("+");
 										prefixed = true;
 									}
 									mode_changes.append("o ");
+									mode_changes.append(oper);
 								} else {
 									response.append("441 ")
 											.append(cl.nick)

@@ -23,7 +23,7 @@
 class Client {
 	public:
 		// string ip unnec. was playing.
-		Client(int fd, string ip) : socket(fd), ip_addr(ip), nick(""), user(""), host(""), server(""), realname(""), fullname(""), remainder(""), auth(false), registered(false) {};
+		Client(int fd, string ip) : socket(fd), ip_addr(ip), nick(""), user(""), host(""), server(""), realname(""), fullname(""), remainder(""), auth(false), registered(false), joined_channels() {};
 		// TODO: OCF format etc
 		~Client() {};
 
@@ -44,7 +44,7 @@ class Client {
 		std::set<string> joined_channels;
 
 		static std::map<string, Client &> client_list;			// currently "global"
-		// static std::map<string, std::set<string> > channels;	// likely will be refactored
+		static std::map<int, Client &> connections;				// currently "global"	
 
 	private:
 		Client() {};
