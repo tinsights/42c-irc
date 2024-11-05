@@ -6,7 +6,7 @@
 /*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/20 14:18:00 by tinaes            #+#    #+#             */
-/*   Updated: 2024/10/20 14:35:29 by tinaes           ###   ########.fr       */
+/*   Updated: 2024/11/06 03:03:54 by xlow             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,9 +18,8 @@
 
 class Channel {
 	public:
-		Channel(string name) 
-			: name(name), opers(), users(), passwd(""), topic(""), invite_only(false), topic_protected(true), passwd_protected(false) {};
-		~Channel() {};
+		Channel(string name);
+		~Channel();
 
 		// eventually private, lazy to do getters/setters for now:
 		string name;			//chn name. todo: validation
@@ -41,7 +40,9 @@ class Channel {
 
 		static std::map<string, Channel & > channel_list;
 	private:
-		Channel() {};
+		Channel();
+		Channel(const Channel&);
+		Channel& operator=(const Channel&);
 };
 
 

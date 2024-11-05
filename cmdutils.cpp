@@ -6,7 +6,7 @@
 /*   By: tinaes <tinaes@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/10/17 15:43:21 by tjegades          #+#    #+#             */
-/*   Updated: 2024/10/20 14:34:23 by tinaes           ###   ########.fr       */
+/*   Updated: 2024/11/06 03:23:31 by xlow             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,7 +46,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			else
 				response.append("*"); // can set to default
 			response.append(" ");
-			response.append(msg.cmd); 	
+			response.append(msg.cmd);
 			response.append(" :Unknown command");
 			break;
 		case 0:
@@ -55,7 +55,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		ERR_NEEDMOREPARAMS 		461 DONE
 			 * 		ERR_ALREADYREGISTERED 	462 DONE
 			 * 		ERR_PASSWDMISMATCH		464 DONE
-			 * 
+			 *
 			*/
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
 
@@ -85,14 +85,14 @@ void execute_cmd(Client &cl, Message & msg) {
 				 * - for e.g. cant be channel name, else later control flow will be confused
 				 * - check protocol for more info
 				 * - rfc2812 states: nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
-				 * 
+				 *
 				*/
 			if (!cl.auth) {
 				/**
 				 * Unsure if should send anything back (cybersec: can guess pw)
 				 * but want to differentiate between clients / server hanging
 				 * and other incorrect behaviour
-				 * 
+				 *
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
@@ -132,19 +132,19 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 2: // USER
 				/**
-				 * TODO: 
+				 * TODO:
 				 * - write more comments for xf
 				 * - upstream format check?
 				 * - valid names
 				 * format: <username> <hostname> <servername> :<realname>
-				 * 
+				 *
 				*/
 			if (!cl.auth) {
 				/**
 				 * Unsure if should send anything back (cybersec: can guess pw)
 				 * but want to differentiate between clients / server hanging
 				 * and other incorrect behaviour
-				 * 
+				 *
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
@@ -194,9 +194,9 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 3: // PRIVMSG
 				/**
-				 * TODO: 
+				 * TODO:
 				 * - write more comments for xf
-				 * 
+				 *
 				*/
 			if (msg.params.length()) {
 				string recpt = msg.param_list[0];
@@ -214,7 +214,7 @@ void execute_cmd(Client &cl, Message & msg) {
 							.append("\r\n");
 						send(Client::client_list.at(recpt).socket, message.c_str(), message.length(), 0);
 						break;
-					} else if (Channel::channel_list.find(recpt) != Channel::channel_list.end()) { 
+					} else if (Channel::channel_list.find(recpt) != Channel::channel_list.end()) {
 						// send to channel
 						string message;
 						message
@@ -260,31 +260,31 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 4: // JOIN
-			/** 
+			/**
 			 *  Potential replies:
 			 * 		ERR_NEEDMOREPARAMS	461
 			 * 		ERR_BADCHANMASK 	476 <-- channel format wrong
 			 * 		ERR_BADCHANNELKEY 	475 <-- wrong channel password, if req
 			 * 		ERR_INVITEONLYCHAN	473
-			 * 
+			 *
 			 * 		RPL_TOPIC 332 && RPL_NAMEREPLY 353 <-- on success
 			 * 		DONE:	:server 353 NICK = CHNLNAME :list of nicknames // honestly what is the equals sign? idk im following liberachat
 			 *	 			:server 366 NICK CHNLNAME :End of /NAMES list.T
 			 				TODO: add @ prefix for ops
-			 * 
+			 *
 			 *  TODO:
 			 * 		- validate chnl name i.e. params BADCHANMASK
 			 * 		- channel restrictions i.e. BADCHANNELKEY / INVITEONLYCHAN
 			 * 	DOING:
 			 * 		 - send back RPL_TOPIC and RPL_NAMEREPLY
-			 * 		
+			 *
 			*/
-			if (!cl.auth) {
+			if (!cl.registered) {
 				/**
 				 * Unsure if should send anything back (cybersec: can guess pw)
 				 * but want to differentiate between clients / server hanging
 				 * and other incorrect behaviour
-				 * 
+				 *
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
@@ -304,7 +304,7 @@ void execute_cmd(Client &cl, Message & msg) {
 					}
 					chnl.users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
-					// for other users 
+					// for other users
 					string announcement = ":";
 					announcement.append(cl.fullname)
 								.append(" JOIN ")
@@ -387,7 +387,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			cout << cl.nick << " has joined " << msg.params << endl;
 			break;
 		case 5: // QUIT
-			/** 
+			/**
 			 * Response:
 			 * 	:<nick>!<user>>@<host> QUIT :Client Quit
 			*/
@@ -401,13 +401,13 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * Even though subject does not require QUIT command
 			 * good to do? maybe can differentiate between irssi clients
 			 * and nc client based on CAP LS first command
-			 * 
+			 *
 			*/
 			// Client::client_list.erase(cl.nick);
 			// close(cl.socket);
 			// connections.erase(cl.socket);
 			break;
-		case 6: // KICK (in progress)	
+		case 6: // KICK (in progress)
 			/**
 			 *  Potential replies:
 			 * 		ERR_NEEDMOREPARAMS 461
@@ -421,7 +421,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				 * Unsure if should send anything back (cybersec: can guess pw)
 				 * but want to differentiate between clients / server hanging
 				 * and other incorrect behaviour
-				 * 
+				 *
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
@@ -429,11 +429,11 @@ void execute_cmd(Client &cl, Message & msg) {
 				break;
 			}
 			if (msg.params.length()) { // <channel> <user>
-				/** TODO: 
+				/** TODO:
 				 * 	- check if both channel and user present in params (netcat proofing)
 				 * 	- check if channel legit
 				 *  - check if user is in channel and oper
-				 *  - kick! 
+				 *  - kick!
 				*/
 
 			} else {
@@ -458,7 +458,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				 * Unsure if should send anything back (cybersec: can guess pw)
 				 * but want to differentiate between clients / server hanging
 				 * and other incorrect behaviour
-				 * 
+				 *
 				 * i.e. every message should have some sort of response. good for debugging
 				*/
 				response.append("451 ");
@@ -524,7 +524,7 @@ void execute_cmd(Client &cl, Message & msg) {
 						response.append(cl.nick);
 						response.append(" :You're not a channel operator");
 					}
-				} 
+				}
 			else {
 				// not enough params
 				response.append("461 ");
@@ -592,14 +592,14 @@ void execute_cmd(Client &cl, Message & msg) {
 					|| (modes[0] != '+' && modes[0] != '-')				// first char must be + or -
 					|| modes.find_first_of("itko") == string::npos)		//	one of i t k o must be present
 				{
-					response.append("501 ")	
+					response.append("501 ")
 							.append(cl.nick)
 							.append(" :Unknown MODE flag");
 					break;
 				}
 				// split modes into add and remove
 				// add modes
-				
+
 				string mode_changes ="";
 				bool add = true;
 				bool prefixed = false;

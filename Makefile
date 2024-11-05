@@ -6,13 +6,13 @@
 #    By: tjegades <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2024/06/30 15:16:11 by tjegades          #+#    #+#              #
-#    Updated: 2024/11/06 02:29:38 by xlow             ###   ########.fr        #
+#    Updated: 2024/11/06 02:58:54 by xlow             ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME = ircserv
 
-SRCS = main.cpp serverutils.cpp cmdutils.cpp Message.cpp Client.cpp
+SRCS = main.cpp serverutils.cpp cmdutils.cpp Message.cpp Client.cpp Channel.cpp
 OBJS = $(SRCS:.cpp=.o)
 DEPS = $(SRCS:.cpp=.d)
 
