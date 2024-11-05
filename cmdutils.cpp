@@ -22,9 +22,9 @@
 // RPL_001 welcome msg template
 // :localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>CRLF
 
-void execute_cmd(Client &cl, string &cmd) {
-	Message msg(cmd);
-	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "MODE", "PING", "TOPIC", "INVITE"};
+void execute_cmd(Client &cl, Message & msg) {
+	// Message msg(cmd);
+	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "TOPIC", "INVITE", "MODE", "PING"};
 	int index = -1;
 	for (int i = 0; i < NUM_CMDS; ++i) {
 		if (msg.cmd == cmds[i]) {
@@ -199,8 +199,9 @@ void execute_cmd(Client &cl, string &cmd) {
 				 * 
 				*/
 			if (msg.params.length()) {
-				if (msg.params.find_first_of(' ') != string::npos) {
-					string recpt = msg.params.substr(0, msg.params.find_first_of(' '));
+				string recpt = msg.param_list[0];
+				string privmsg = msg.trailing;
+				if (privmsg.length()) {
 					if (Client::client_list.find(recpt) != Client::client_list.end()) {
 						string message;
 						message
@@ -337,6 +338,16 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append(" ")
 							.append(msg.params)
 							.append(" :End of /NAMES list.");
+					// add RPL_TOPIC
+					if (chnl.topic.length()) {
+						response.append("\r\n")
+								.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					}
 				} else {
 					// channel doesnt exist
 					Channel *newchnl = new Channel(msg.params); // heap memory must be cleared. unless we set a static channel limit in main.
@@ -432,15 +443,97 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append(" KICK :Not enough parameters");
 				break;
 			}
-		case 9: // TOPIC
+		case 7: // TOPIC
 			/**
 			 * TODO: Implement TOPIC command functionality
 			 * - Check if user is in a channel
 			 * - Set the topic for the channel
 			 * - Respond with appropriate messages
 			 */
+			// set topic if user is oper
+			// send topic to all users in channel
+			// send RPL_TOPIC to user
+			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+
+			if (msg.params.length()) {
+				// find channel if exists
+				if (Channel::channel_list.find(msg.params) == Channel::channel_list.end()) {
+					// ERR_NOSUCHCHANNEL 403
+					response.append("403 ");
+					response.append(cl.nick);
+					response.append(" :No such channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(msg.params);
+
+				if (msg.trailing.length() == 0) { // getting topic
+					if (chnl.topic.length()) {
+						// send RPL_TOPIC to user
+						response.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					} else {
+						// ERR_NOTOPIC 331
+						response.append("331 ");
+						response.append(cl.nick);
+						response.append(" ");
+						response.append(msg.params);
+						response.append(" :No topic is set");
+					}
+					break;
+				}
+				else if (!chnl.topic_protected || chnl.opers.find(cl.nick) != chnl.opers.end()) { // setting topic if oper
+						chnl.topic = msg.trailing;
+						// send topic to all users in channel
+						string announcement = ":";
+						announcement.append(cl.fullname)
+									.append(" TOPIC ")
+									.append(msg.params)
+									.append(" :")
+									.append(msg.trailing)
+									.append("\r\n");
+						std::set<string>::iterator it = chnl.users.begin();
+						while (it != chnl.users.end()) {
+							send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
+							++it;
+						}
+						// send RPL_TOPIC to user
+						response.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					} else {
+						// ERR_CHANOPRIVSNEEDED 482
+						response.append("482 ");
+						response.append(cl.nick);
+						response.append(" :You're not a channel operator");
+					}
+				} 
+			else {
+				// not enough params
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" TOPIC :Not enough parameters");
+				break;
+			}
 			break;
-		case 10: // INVITE
+		case 8: // INVITE
 			/**
 			 * TODO: Implement INVITE command functionality
 			 * - Check if user is in a channel
@@ -448,6 +541,198 @@ void execute_cmd(Client &cl, string &cmd) {
 			 * - Send an invitation to the user
 			 * - Respond with appropriate messages
 			 */
+			break;
+		case 9: //MODE
+			/**
+			 * TODO: Implement MODE command functionality
+			 * - Check if user is in a channel
+			 * - Check if the user is an operator
+			 * - Set the mode for the channel
+			 * - Respond with appropriate messages
+			 */
+			// get chnl and mode from params
+			if (!cl.auth) {
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+			else if (msg.param_list.size()  < 2) {
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" MODE :Not enough parameters");
+				break;
+			} else {
+				// split params into channel and mode
+				string chnlname = msg.param_list[0];
+				string modes = msg.param_list[1];
+				if (modes.length() == 0) {
+					response.append("461 ")
+							.append(cl.nick)
+							.append(" MODE :Not enough parameters");
+					break;
+				}
+				// check if channel exists
+				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
+					response.append("403 ")
+							.append(cl.nick)
+							.append(" :No such channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(chnlname);
+				// check if client is oper
+				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
+					response.append("482 ")
+							.append(cl.nick)
+							.append(" :You're not a channel operator");
+					break;
+				}
+				// validate mode params. only accept i t k o
+				// mode can be +i-t or +it, etc
+				if (modes.find_first_not_of("+-itko") != string::npos	// has other rubbish
+					|| (modes[0] != '+' && modes[0] != '-')				// first char must be + or -
+					|| modes.find_first_of("itko") == string::npos)		//	one of i t k o must be present
+				{
+					response.append("501 ")	
+							.append(cl.nick)
+							.append(" :Unknown MODE flag");
+					break;
+				}
+				// split modes into add and remove
+				// add modes
+				
+				string mode_changes ="";
+				bool add = true;
+				bool prefixed = false;
+				for (size_t i = 0; i < modes.length(); ++i) {
+					while (modes[i] == '+' || modes[i] == '-') {
+						prefixed = false;
+						add = modes[i] == '+';
+						++i;
+					}
+					if (add) {
+						if (modes[i] == 'i' && !chnl.invite_only) {
+							chnl.invite_only = true;
+							if (!prefixed) {
+								mode_changes.append("+");
+								prefixed = true;
+							}
+							mode_changes.append("i");
+						} else if (modes[i] == 't' && !chnl.topic_protected) {
+							chnl.topic_protected = true;
+							if (!prefixed) {
+								mode_changes.append("+");
+								prefixed = true;
+							}
+							mode_changes.append("t");
+						} else if (modes[i] == 'k' && !chnl.passwd_protected) {
+							if (msg.param_list.size() > 2) {
+								chnl.passwd = msg.param_list[2];
+								chnl.passwd_protected = true;
+								if (!prefixed) {
+									mode_changes.append("+");
+									prefixed = true;
+								}
+								mode_changes.append("k");
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						} else if (modes[i] == 'o') {
+							// add oper
+							// check if next param is present
+							if (msg.param_list.size() > 2) {
+								string oper = msg.param_list[2];
+								if (chnl.users.find(oper) != chnl.users.end()) {
+									chnl.opers.insert(oper);
+									if (!prefixed) {
+										mode_changes.append("+");
+										prefixed = true;
+									}
+									mode_changes.append("o ");
+								} else {
+									response.append("441 ")
+											.append(cl.nick)
+											.append(" ")
+											.append(oper)
+											.append(" :They aren't on that channel");
+									break;
+								}
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						}
+					} else {
+						if (modes[i] == 'i' && chnl.invite_only) {
+							chnl.invite_only = false;
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("i");
+						} else if (modes[i] == 't' && chnl.topic_protected) {
+							chnl.topic_protected = false;
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("t");
+						} else if (modes[i] == 'k' && chnl.passwd_protected) {
+							chnl.passwd_protected = false;
+							chnl.passwd.clear();
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("k");
+						} else if (modes[i] == 'o') {
+							// remove oper
+							// check if next param is present
+							if (msg.param_list.size() > 2) {
+								string oper = msg.param_list[2];
+								if (chnl.opers.find(oper) != chnl.opers.end()) {
+									chnl.opers.erase(oper);
+									if (!prefixed) {
+										mode_changes.append("-");
+										prefixed = true;
+									}
+									mode_changes.append("o");
+								} else {
+									response.append("441 ")
+											.append(cl.nick)
+											.append(" ")
+											.append(oper)
+											.append(" :They aren't on that channel");
+									break;
+								}
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						}
+					}
+				}
+				if (mode_changes.length()) {
+					string announcement = ":";
+					announcement.append(cl.fullname)
+								.append(" MODE ")
+								.append(chnlname)
+								.append(" ")
+								.append(mode_changes)
+								.append("\r\n");
+					std::set<string>::iterator it = chnl.users.begin();
+					while (it != chnl.users.end()) {
+						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
+						++it;
+					}
+				}
+			}
 			break;
 		default:
 			// Existing cases...
