@@ -80,7 +80,12 @@ static void	count_params(string &params, string& trailing, vector<string>& param
 	YEET BOLDRED << setw(20) << "Param count: " << 15 - available_params ENDL;
 }
 
-Message::Message(string &raw) {
+Message::Message(string raw) :
+cmd(""),
+prefix(""),
+trailing(""),
+params("")
+{
 	this->valid = true;
 	try {
 		if (raw.length() >= 510)
