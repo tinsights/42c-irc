@@ -37,7 +37,7 @@ class Channel {
 		bool 	invite_only;
 		bool	topic_protected;
 		bool	passwd_protected;
-		// size_t	user_limit; // default to high number instead of toggling switch
+		size_t	user_limit; // default to high number instead of toggling switch
 
 		static std::map<string, Channel & > channel_list;
 	private:
