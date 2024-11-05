@@ -22,9 +22,9 @@
 // RPL_001 welcome msg template
 // :localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>CRLF
 
-void execute_cmd(Client &cl, string &cmd) {
-	Message msg(cmd);
-	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "MODE", "PING", "TOPIC", "INVITE"};
+void execute_cmd(Client &cl, Message & msg) {
+	// Message msg(cmd);
+	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "TOPIC", "INVITE", "MODE", "PING"};
 	int index = -1;
 	for (int i = 0; i < NUM_CMDS; ++i) {
 		if (msg.cmd == cmds[i]) {
@@ -337,6 +337,16 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append(" ")
 							.append(msg.params)
 							.append(" :End of /NAMES list.");
+					// add RPL_TOPIC
+					if (chnl.topic.length()) {
+						response.append("\r\n")
+								.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					}
 				} else {
 					// channel doesnt exist
 					Channel *newchnl = new Channel(msg.params); // heap memory must be cleared. unless we set a static channel limit in main.
@@ -432,15 +442,97 @@ void execute_cmd(Client &cl, string &cmd) {
 				response.append(" KICK :Not enough parameters");
 				break;
 			}
-		case 9: // TOPIC
+		case 7: // TOPIC
 			/**
 			 * TODO: Implement TOPIC command functionality
 			 * - Check if user is in a channel
 			 * - Set the topic for the channel
 			 * - Respond with appropriate messages
 			 */
+			// set topic if user is oper
+			// send topic to all users in channel
+			// send RPL_TOPIC to user
+			if (!cl.auth) {
+				/**
+				 * Unsure if should send anything back (cybersec: can guess pw)
+				 * but want to differentiate between clients / server hanging
+				 * and other incorrect behaviour
+				 * 
+				 * i.e. every message should have some sort of response. good for debugging
+				*/
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+
+			if (msg.params.length()) {
+				// find channel if exists
+				if (Channel::channel_list.find(msg.params) == Channel::channel_list.end()) {
+					// ERR_NOSUCHCHANNEL 403
+					response.append("403 ");
+					response.append(cl.nick);
+					response.append(" :No such channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(msg.params);
+
+				if (msg.trailing.length() == 0) { // getting topic
+					if (chnl.topic.length()) {
+						// send RPL_TOPIC to user
+						response.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					} else {
+						// ERR_NOTOPIC 331
+						response.append("331 ");
+						response.append(cl.nick);
+						response.append(" ");
+						response.append(msg.params);
+						response.append(" :No topic is set");
+					}
+					break;
+				}
+				else if (!chnl.topic_protected || chnl.opers.find(cl.nick) != chnl.opers.end()) { // setting topic if oper
+						chnl.topic = msg.trailing;
+						// send topic to all users in channel
+						string announcement = ":";
+						announcement.append(cl.fullname)
+									.append(" TOPIC ")
+									.append(msg.params)
+									.append(" :")
+									.append(msg.trailing)
+									.append("\r\n");
+						std::set<string>::iterator it = chnl.users.begin();
+						while (it != chnl.users.end()) {
+							send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
+							++it;
+						}
+						// send RPL_TOPIC to user
+						response.append("332 ")
+								.append(cl.nick)
+								.append(" ")
+								.append(msg.params)
+								.append(" :")
+								.append(chnl.topic);
+					} else {
+						// ERR_CHANOPRIVSNEEDED 482
+						response.append("482 ");
+						response.append(cl.nick);
+						response.append(" :You're not a channel operator");
+					}
+				} 
+			else {
+				// not enough params
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" TOPIC :Not enough parameters");
+				break;
+			}
 			break;
-		case 10: // INVITE
+		case 8: // INVITE
 			/**
 			 * TODO: Implement INVITE command functionality
 			 * - Check if user is in a channel
@@ -448,6 +540,16 @@ void execute_cmd(Client &cl, string &cmd) {
 			 * - Send an invitation to the user
 			 * - Respond with appropriate messages
 			 */
+			break;
+		case 9: //MODE
+			/**
+			 * TODO: Implement MODE command functionality
+			 * - Check if user is in a channel
+			 * - Check if the user is an operator
+			 * - Set the mode for the channel
+			 * - Respond with appropriate messages
+			 */
+			// get chnl and mode from params
 			break;
 		default:
 			// Existing cases...

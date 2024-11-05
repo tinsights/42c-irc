@@ -18,7 +18,7 @@
 
 int		get_server_socket();
 void	convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize);
-void 	execute_cmd(Client &cl, string &cmd);
+void 	execute_cmd(Client &cl, Message & msg);
 
 /**
  * seems insufficient for clean exit,
@@ -173,7 +173,10 @@ int main(void) {
 								/* -------------------------------------------------------------------------- */
 								/*                               EXECUTE COMMAND                              */
 								/* -------------------------------------------------------------------------- */
-								execute_cmd(cl, cmd);
+								Message msg(cmd);
+								if (msg.valid) {
+									execute_cmd(cl, msg);
+								}
 								message.erase(0, idx + 2); // +2 bc of crlf
 								idx = message.find("\r\n", 0);
 							}
