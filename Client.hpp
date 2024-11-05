@@ -23,9 +23,9 @@
 class Client {
 	public:
 		// string ip unnec. was playing.
-		Client(int fd, string ip) : socket(fd), ip_addr(ip), nick(""), user(""), host(""), server(""), realname(""), fullname(""), remainder(""), auth(false), registered(false) {};
+		Client(int fd, string ip);
 		// TODO: OCF format etc
-		~Client() {};
+		~Client();
 
 		// eventually private, with getters and setters etc:
 		int 	socket;
@@ -47,7 +47,9 @@ class Client {
 		// static std::map<string, std::set<string> > channels;	// likely will be refactored
 
 	private:
-		Client() {};
+		Client();
+		Client(const Client&);
+		Client&	operator=(const Client&);
 		
 };
 

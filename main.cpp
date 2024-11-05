@@ -41,7 +41,7 @@ void handler(int sig) {
  * */ 
 std::map<string, Client &> Client::client_list;
 std::map<string, Channel & > Channel::channel_list;
-std::map<int, Client> connections; // global for now.
+std::map<int, Client &> connections; // global for now.
 
 #define MAX_CONNS 100
 
@@ -127,7 +127,7 @@ int main(void) {
 						 * MARK: SEGGY IF CLIENT CLOSES TERMINAL!
 						 * FIXED!
 						*/
-						Client cl = connections.at(fds[i].fd); // may need to guard against SIGINT by checking server_running bool :(
+						Client &cl = connections.at(fds[i].fd); // may need to guard against SIGINT by checking server_running bool :(
 						// dropping connection, check if fully registered in order to remove from "databases"
 						if (cl.auth && cl.nick.length()) {
 							// remove from all channels
