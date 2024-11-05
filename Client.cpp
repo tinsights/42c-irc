@@ -33,7 +33,7 @@ bool	Client::is_valid_nick(string nickname) {
 		return (false);
 	if (!is_special(nickname[0]) && !std::isalpha(nickname[0]))
 		return (false);
-	for (int i = 1; i < nickname.size(); i++) {
+	for (size_t i = 1; i < nickname.size(); i++) {
 		if (!std::isalpha(nickname[i]) && !std::isdigit(nickname[i]) && !is_special(nickname[i]))
 			return (false);
 	}
