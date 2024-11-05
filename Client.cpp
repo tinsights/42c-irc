@@ -11,21 +11,25 @@ Client&	Client::operator=(const Client&) {
 Client::~Client() {}
 
 Client::Client(int fd, string ip) :
-socket(fd),
-ip_addr(ip),
-nick(""),
-user(""),
-host(""),
-server(""),
-realname(""),
-fullname(""),
-auth(false),
-registered(false) {}
+	socket(fd),
+	ip_addr(ip),
+	nick(""),
+	user(""),
+	host(""),
+	server(""),
+	realname(""),
+	fullname(""),
+	auth(false),
+	registered(false) {}
 
 static bool	is_special(char c) {
 	if (!(c >= 91 && c <= 96) && !(c >= 123 && c <= 125))
 		return (false);
 	return (true);
+}
+
+bool Client::ready_to_register() const {
+	return (this->auth && this->nick.length() && this->host.length() && this->user.length() && !this->registered);
 }
 
 bool	Client::is_valid_nick(string nickname) {

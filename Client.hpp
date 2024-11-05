@@ -36,6 +36,7 @@ class Client {
 
 		bool	auth;		// if password provided was correct
 		bool	registered;	// if successfully registered with unique NICK and full USER details
+		bool	ready_to_register() const;
 
 		std::set<string> joined_channels;
 

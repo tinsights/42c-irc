@@ -19,11 +19,7 @@
 #define NUM_CMDS 11
 #define PASSWD "hitchhiker"
 
-// RPL_001 welcome msg template
-// :localhost 001 <nick> :Welcome to the Internet Relay Network <nick>!<user>@<host>CRLF
-
 void execute_cmd(Client &cl, Message & msg) {
-	// Message msg(cmd);
 	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "TOPIC", "INVITE", "MODE", "PING"};
 	int index = -1;
 	for (int i = 0; i < NUM_CMDS; ++i) {
@@ -32,33 +28,18 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		}
 	}
-
-	// upstream msg validity check??
-	string servername = ":ft_irc "; // thats us baby. maybe can use gethostname or get our ip addr
+	string 	servername = ":ft_irc ";
 	string	response = servername;
 
 	switch (index) {
 		case -1:
-			// bad cmd
 			response.append("421 ");
-			if (cl.nick.length())
-				response.append(cl.nick);
-			else
-				response.append("*"); // can set to default
-			response.append(" ");
-			response.append(msg.cmd);
-			response.append(" :Unknown command");
+			if (cl.nick.length()) 	response.append(cl.nick);
+			else 					response.append("*");
+			response.append(msg.cmd + " :Unknown command");
 			break;
-		case 0:
-			/** PASS
-			 * Potential replies:
-			 * 		ERR_NEEDMOREPARAMS 		461 DONE
-			 * 		ERR_ALREADYREGISTERED 	462 DONE
-			 * 		ERR_PASSWDMISMATCH		464 DONE
-			 *
-			*/
+		case 0: // PASS
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
-
 			if (msg.params.length()) {
 				if (cl.registered == false) {
 					cl.auth = msg.params == PASSWD;
@@ -79,28 +60,19 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 1: // NICK
-				/**
-				 * TODO:
-				 * - !!!! validate params as valid nick
-				 * - for e.g. cant be channel name, else later control flow will be confused
-				 * - check protocol for more info
-				 * - rfc2812 states: nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
-				 *
-				*/
 			if (!cl.auth) {
-				/**
-				 * Unsure if should send anything back (cybersec: can guess pw)
-				 * but want to differentiate between clients / server hanging
-				 * and other incorrect behaviour
-				 *
-				 * i.e. every message should have some sort of response. good for debugging
-				*/
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append(" * :You have not registered");
 				break;
 			}
 			if (msg.params.length()) {
-				if (Client::client_list.find(msg.params) != Client::client_list.end() ) {
+				if (!Client::is_valid_nick(msg.params)) {
+					response.append("432 * ");
+					response.append(msg.params);
+					response.append(" :Erroneous nickname");
+					break;
+				}
+				else if (Client::client_list.find(msg.params) != Client::client_list.end() ) {
 					response.append("433 * ");
 					response.append(msg.params);
 					response.append(" :Nickname is already in use.");
@@ -111,116 +83,61 @@ void execute_cmd(Client &cl, Message & msg) {
 				response.append("431 :No nickname given");
 				break;
 			}
-			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
-			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
-				string fullname = "";
-				fullname.append(cl.nick);
-				fullname.append("!");
-				fullname.append(cl.user);
-				fullname.append("@");
-				fullname.append(cl.ip_addr);
-				cl.fullname = fullname;
+			
+			if (cl.ready_to_register()) {
+				cl.fullname = cl.nick + "!" + cl.user + "@" + cl.ip_addr;
 				cl.registered = true;
 				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
-				response.append("001 ");
-				response.append(cl.nick);
-				response.append(" :Welcome to the Internet Relay Network ");
-				response.append(cl.fullname);
-			} else {
-				// cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
+				response.append("001 " + cl.nick + " :Welcome to the Internet Relay Network " + cl.fullname);
 			}
 			break;
 		case 2: // USER
-				/**
-				 * TODO:
-				 * - write more comments for xf
-				 * - upstream format check?
-				 * - valid names
-				 * format: <username> <hostname> <servername> :<realname>
-				 *
-				*/
 			if (!cl.auth) {
-				/**
-				 * Unsure if should send anything back (cybersec: can guess pw)
-				 * but want to differentiate between clients / server hanging
-				 * and other incorrect behaviour
-				 *
-				 * i.e. every message should have some sort of response. good for debugging
-				*/
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append(" * :You have not registered");
 				break;
 			}
 			if (msg.params.length() && msg.trailing.length()) {
-				// size_t space_idx = msg.params.find_first_of(' ');
-				// cl.user = msg.params.substr(0, space_idx);
-				// cl.host = msg.params.substr(space_idx + 1 , msg.params.find_first_of(' ', space_idx) - space_idx);
 				std::stringstream ss(msg.params);
 				ss >> cl.user;
+				if (Client::is_valid_user(cl.user) == false) {
+					response.append("501 ");
+					response.append(cl.nick);
+					response.append(" :Invalid username");
+					cl.user.clear();
+					break;
+				}
 				ss >> cl.host;
 				ss >> cl.server;
-				cl.realname.clear();
 				cl.realname = msg.trailing;
 			} else {
-				// ERR_NEEDMOREPARAMS	461
-				response.append("461 ")
-					.append(cl.nick)
-					.append(" USER :Not enough parameters");
+				response.append("461 " + cl.nick + " USER :Not enough parameters");
 			}
-			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
-			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
-				string fullname = "";
-				fullname.append(cl.nick)
-					.append("!")
-					.append(cl.user)
-					.append("@")
-					.append(cl.ip_addr);
-				cl.fullname.clear();
-				cl.fullname = fullname;
+			
+			if (cl.ready_to_register()) {
+				cl.fullname = (cl.nick + "!" + cl.user + "@" + cl.ip_addr);
 				cl.registered = true;
-
 				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
-				response.append("001 ")
-					.append(cl.nick)
-					.append(" :Welcome to the Internet Relay Network ")
-					.append(cl.fullname);
-			} else {
-				// cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
+				response.append("001 " + cl.nick + " :Welcome to the Internet Relay Network " + cl.fullname);
 			}
 			break;
 		case 3: // PRIVMSG
-				/**
-				 * TODO:
-				 * - write more comments for xf
-				 *
-				*/
 			if (msg.params.length()) {
 				string recpt = msg.param_list[0];
 				string privmsg = msg.trailing;
 				if (privmsg.length()) {
 					if (Client::client_list.find(recpt) != Client::client_list.end()) {
-						string message;
-						message
-							.append(":")
-							.append(cl.fullname)
-							.append(" PRIVMSG ")
-							.append(recpt)
-							.append(" :")
-							.append(msg.trailing)
-							.append("\r\n");
+						string message = ":" + cl.fullname + " PRIVMSG " + recpt + " :" + msg.trailing + "\r\n";
 						send(Client::client_list.at(recpt).socket, message.c_str(), message.length(), 0);
 						break;
-					} else if (Channel::channel_list.find(recpt) != Channel::channel_list.end()) {
-						// send to channel
-						string message;
-						message
-							.append(":")
-							.append(cl.fullname)
-							.append(" PRIVMSG ")
-							.append(recpt)
-							.append(" :")
-							.append(msg.trailing)
-							.append("\r\n");
+					} else if (Channel::channel_list.find(recpt) != Channel::channel_list.end()){
+						// check that user is in channel
+						Channel & chnl = Channel::channel_list.at(recpt);
+						if (chnl.users.find(cl.nick) == chnl.users.end()) {
+							response.append("404 " + cl.nick + " " + recpt + " :Cannot send to channel");
+							break;
+						}
+						string message = ":" + cl.fullname + " PRIVMSG " + recpt + " :" + msg.trailing + "\r\n";
 						std::set<string>::iterator it = Channel::channel_list.at(recpt).users.begin();
 						while (it != Channel::channel_list.at(recpt).users.end()) {
 							if (*it != cl.nick) {
@@ -228,31 +145,21 @@ void execute_cmd(Client &cl, Message & msg) {
 									int socket = Client::client_list.at(*it).socket;
 									send(socket, message.c_str(), message.length(), 0);
 								} catch (std::exception const & e) {
-									YEET BOLDYELLOW << "OOPSIE: " << *it << " ";
 									YEET BOLDYELLOW << e.what() ENDL;
 								}
 							}
 							++it;
-							YEET "looping" ENDL;
 						}
 					} else {
-						response.append("401 ");
-						response.append(cl.nick);
-						response.append(" :No such nick (");
-						response.append(recpt);
-						response.append(")");
+						response.append("401 " + cl.nick + " " + recpt + " :No such nick/channel");
 					}
 				}
 				else {
-					response.append("412 ");
-					response.append(cl.nick);
-					response.append(" :No text to send");
+					response.append("412 " + cl.nick + " :No text to send");
 				}
 
 			} else {
-				response.append("411 ");
-				response.append(cl.nick);
-				response.append(" :No recipient given (PRIVMSG)");
+				response.append("411 " + cl.nick + " PRIVMSG :No recipient given");
 			}
 			break;
 		case 4: // JOIN
@@ -276,74 +183,51 @@ void execute_cmd(Client &cl, Message & msg) {
 			 *
 			*/
 			if (!cl.registered) {
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append(" * :You have not registered");
 				break;
 			}
 			if (msg.params.length()) {
-				if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
-					// channel currently exists
+				if (Channel::is_valid_channel(msg.params) == false) {
+					response.append("476 " + cl.nick + " :Bad channel mask");
+					break;
+				}
+				else if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
 					Channel & chnl = Channel::channel_list.at(msg.params);
 
 					if (chnl.users.find(cl.nick) != chnl.users.end() ){
-						// user already in channel
-						// should send err msg
-						// apparently IRC servers do nothing here
 						break;
 					}
 					else if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
 						// user not invited
-						response.append("473 ");
-						response.append(cl.nick);
-						response.append(" ");
-						response.append(msg.params);
-						response.append(" :Cannot join channel (+i)");
+						response.append("473 " + cl.nick + " " + msg.params + " :Cannot join channel, requires invite. (+i)");
 						break;
 					}
 					else if (chnl.passwd_protected) {
 						if (msg.param_list.size() < 2) {
 							// channel has password
 							// send ERR_BADCHANNELKEY
-							response.append("475 ");
-							response.append(cl.nick);
-							response.append(" ");
-							response.append(msg.params);
-							response.append(" :Cannot join channel, requires password (+k)");
+							response.append("475 " + cl.nick + " " + msg.params + " :Cannot join channel, requires password. (+k)");
 							break;
 						} else if (msg.param_list[1] != chnl.passwd) {
 							// wrong password
-							response.append("464 ");
-							response.append(cl.nick);
-							response.append(" ");
-							response.append(msg.params);
-							response.append(" :Password incorrect.");
+							response.append("464 " + cl.nick + " " + msg.params + " :Password incorrect.");
 							break;
 						}
 						break;
 					}
 					else if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
 						// channel is full
-						response.append("471 ");
-						response.append(cl.nick);
-						response.append(" ");
-						response.append(msg.params);
-						response.append(" :Cannot join channel, channel is full.");
+						response.append("471 " + cl.nick + " " + msg.params + " :Cannot join channel, channel is full.");
 						break;
 					}
 					chnl.users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
 					// for other users
 					string announcement = ":";
-					announcement.append(cl.fullname)
-								.append(" JOIN ")
-								.append(msg.params)
-								.append("\r\n");
+					announcement.append(cl.fullname + " JOIN " + msg.params + "\r\n");
 					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
-					response.append("353 ")
-							.append(cl.nick)
-							.append(" = ")
-							.append(msg.params)
-							.append(" :");
+					response.append("353 " + cl.nick + " = " + msg.params + " :");
 					std::set<string>::iterator it = chnl.users.begin();
 					while (it != chnl.users.end()) {
 						// send annoucnement message to all users in channel
@@ -353,63 +237,36 @@ void execute_cmd(Client &cl, Message & msg) {
 						if (chnl.opers.find(*it) != chnl.opers.end()) {
 							response.append("@");
 						}
-						response.append(*it)
-								.append(" ");
+						response.append(*it + " ");
 						++it;
 					}
 					// add CRLF and end of name list as per
 					// :server 366 nick CHNLNAME :End of /NAMES list.
-					response.append("\r\n")
-							.append(servername)
-							.append("366 ")
-							.append(cl.nick)
-							.append(" ")
-							.append(msg.params)
-							.append(" :End of /NAMES list.");
+					response.append("\r\n" + servername + "366 " + cl.nick + " " + msg.params + " :End of /NAMES list.");
 					// add RPL_TOPIC
 					if (chnl.topic.length()) {
-						response.append("\r\n")
-								.append("332 ")
-								.append(cl.nick)
-								.append(" ")
-								.append(msg.params)
-								.append(" :")
-								.append(chnl.topic);
+						response.append("\r\n" + servername + "332 " + cl.nick + " " + msg.params + " :" + chnl.topic);
 					}
 				} else {
 					// channel doesnt exist
-					Channel *newchnl = new Channel(msg.params); // heap memory must be cleared. unless we set a static channel limit in main.
+					Channel *newchnl = new Channel(msg.params);
 					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, *newchnl));
 					// add user to opers list
 					newchnl->users.insert(cl.nick);
 					newchnl->opers.insert(cl.nick); // should be a public setter that access private members and checks that user is in channel.
 					cl.joined_channels.insert(msg.params);
 					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
-					response.append("353 ")
-							.append(cl.nick)
-							.append(" = ")
-							.append(msg.params)
-							.append(" :");
+					response.append("353 " + cl.nick + " = " + msg.params + " :");
 					// we know the only user in the channel is the one who joined
 					// and they are an oper
-					response.append("@")
-							.append(cl.nick)
-							.append(" ");
+					response.append("@" + cl.nick + " ");
 					// add CRLF and end of name list as per
 					// :server 366 nick CHNLNAME :End of /NAMES list.
-					response.append("\r\n")
-							.append(servername)
-							.append("366 ")
-							.append(cl.nick)
-							.append(" ")
-							.append(msg.params)
-							.append(" :End of /NAMES list.");
+					response.append("\r\n" + servername + "366 " + cl.nick + " " + msg.params + " :End of /NAMES list.");
 				}
 			} else {
 				// not enough params
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" JOIN :Not enough parameters");
+				response.append("461 " + cl.nick + " JOIN :Not enough parameters");
 				break;
 			}
 			cout << cl.nick << " has joined " << msg.params << endl;
@@ -419,21 +276,9 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * Response:
 			 * 	:<nick>!<user>>@<host> QUIT :Client Quit
 			*/
-			response.append(servername);
-			response.append(" :Closing Link: (Client Quit) ");
+			response.append(servername + "QUIT :Client Quit");
 			send(cl.socket, response.c_str(), response.length(), 0);
 			response.erase(response.begin(), response.end());
-
-			/**
-			 * MAY NEED TO DO FOR Netcat
-			 * Even though subject does not require QUIT command
-			 * good to do? maybe can differentiate between irssi clients
-			 * and nc client based on CAP LS first command
-			 *
-			*/
-			// Client::client_list.erase(cl.nick);
-			// close(cl.socket);
-			// connections.erase(cl.socket);
 			break;
 		case 6: // KICK (in progress)
 			/**
@@ -445,15 +290,12 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		ERR_CHANOPRIVSNEEDED 482 <-- not operator
 			*/
 			if (!cl.registered) {
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size() < 2) { // <channel> <user>
 				// not enough params
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" KICK :Not enough parameters");
+				response.append("461 " + cl.nick + " KICK :Not enough parameters");
 				break;
 			}
 			else {// get chnl and user from params
@@ -461,46 +303,30 @@ void execute_cmd(Client &cl, Message & msg) {
 				string user = msg.param_list[1];
 				// check if channel exists
 				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
-					response.append("403 ");
-					response.append(cl.nick);
-					response.append(" :No such channel");
+					response.append("403 " + cl.nick + " :No such channel");
 					break;
 				}
 				Channel & chnl = Channel::channel_list.at(chnlname);
+				// check if client in channel
+				if (chnl.users.find(cl.nick) == chnl.users.end()) {
+					response.append("442 " + cl.nick + " " + chnlname + " :You're not on that channel");
+					break;
+				}
 				// check if this client is a chnl operator
 				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
-					response.append("482 ");
-					response.append(cl.nick);
-					response.append(" " + chnlname);
-					response.append(" :You're not a channel operator");
+					response.append("482 " + cl.nick + " " + chnlname + " :You're not a channel operator");
 					break;
-				}
-				// check if user is in channel
-				if (chnl.users.find(user) == chnl.users.end()) {
-					response.append("442 ");
-					response.append(cl.nick);
-					response.append(" ");
-					response.append(user);
-					response.append(" :User is not in this channel");
-					break;
-				}
-				
+				}				
 				// send kick message to user
-				string kickmsg = ":";
-				kickmsg.append(cl.fullname)
-						.append(" KICK ")
-						.append(chnlname)
-						.append(" ")
-						.append(user);
-				if (msg.trailing.length())
-						kickmsg.append(msg.trailing);
-				kickmsg.append("\r\n");
+				string kickmsg = ":" + cl.fullname + " KICK " + chnlname + " " + user + msg.trailing + "\r\n";
 				// send to all users in channel
 				std::set<string>::iterator it = chnl.users.begin();
 				while (it != chnl.users.end()) {
 					send(Client::client_list.at(*it).socket, kickmsg.c_str(), kickmsg.length(), 0);
 					++it;
 				}
+				// remove channel from user's joined channels
+				cl.joined_channels.erase(chnlname);
 				// kick user
 				chnl.users.erase(user);
 				// if user is in invite list, remove
@@ -510,138 +336,90 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 7: // TOPIC
-			/**
-			 * TODO: Implement TOPIC command functionality
-			 * - Check if user is in a channel
-			 * - Set the topic for the channel
-			 * - Respond with appropriate messages
-			 */
-			// set topic if user is oper
-			// send topic to all users in channel
-			// send RPL_TOPIC to user
 			if (!cl.registered) {
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
 				break;
 			}
-
 			if (msg.params.length()) {
 				// find channel if exists
 				if (Channel::channel_list.find(msg.params) == Channel::channel_list.end()) {
 					// ERR_NOSUCHCHANNEL 403
-					response.append("403 ");
-					response.append(cl.nick);
-					response.append(" :No such channel");
+					response.append("403 " + cl.nick + " :No such channel");
 					break;
 				}
 				Channel & chnl = Channel::channel_list.at(msg.params);
-
 				if (msg.trailing.length() == 0) { // getting topic
 					if (chnl.topic.length()) {
 						// send RPL_TOPIC to user
-						response.append("332 ")
-								.append(cl.nick)
-								.append(" ")
-								.append(msg.params)
-								.append(" :")
-								.append(chnl.topic);
+						response.append("332 " + cl.nick + " " + msg.params + " :" + chnl.topic);
 					} else {
 						// ERR_NOTOPIC 331
-						response.append("331 ");
-						response.append(cl.nick);
-						response.append(" ");
-						response.append(msg.params);
-						response.append(" :No topic is set");
+						response.append("331 " + cl.nick + " " + msg.params + " :No topic is set");
 					}
 					break;
 				}
 				else if (!chnl.topic_protected || chnl.opers.find(cl.nick) != chnl.opers.end()) { // setting topic if oper
 						chnl.topic = msg.trailing;
 						// send topic to all users in channel
-						string announcement = ":";
-						announcement.append(cl.fullname)
-									.append(" TOPIC ")
-									.append(msg.params)
-									.append(" :")
-									.append(msg.trailing)
-									.append("\r\n");
+						string announcement = ":" + cl.fullname + " TOPIC " + msg.params + " :" + msg.trailing + "\r\n";
 						std::set<string>::iterator it = chnl.users.begin();
 						while (it != chnl.users.end()) {
 							send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
 							++it;
 						}
 						// send RPL_TOPIC to user
-						response.append("332 ")
-								.append(cl.nick)
-								.append(" ")
-								.append(msg.params)
-								.append(" :")
-								.append(chnl.topic);
+						response.append("332 " + cl.nick + " " + msg.params + " :" + chnl.topic);
 					} else {
 						// ERR_CHANOPRIVSNEEDED 482
-						response.append("482 ");
-						response.append(cl.nick);
-						response.append(" " + chnl.name);
-						response.append(" :You're not a channel operator");
+						response.append("482 " + cl.nick + " " + msg.params + " :You're not a channel operator");
 					}
 				}
 			else {
 				// not enough params
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" TOPIC :Not enough parameters");
+				response.append("461 " + cl.nick + " TOPIC :Not enough parameters");
 				break;
 			}
 			break;
 		case 8: // INVITE
-			/**
-			 * TODO: Implement INVITE command functionality
-			 * - Check if user is in a channel
-			 * - Check if the invited user exists and is not already in the channel
-			 * - Send an invitation to the user
-			 * - Respond with appropriate messages
-			 */
 			if (!cl.registered) {
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size() < 2) {
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" INVITE :Not enough parameters");
+				response.append("461 " + cl.nick + " INVITE :Not enough parameters");
 				break;
 			} else {
 				// get chnl and user from params
-				string chnlname = msg.param_list[1];
-				string user = msg.param_list[0];
+				string chnlname = msg.param_list[1], user = msg.param_list[0];
+				if (Channel::is_valid_channel(chnlname) == false) {
+					response.append("476 " + cl.nick + " :Bad channel mask");
+					break;
+				}
+				else if (Client::is_valid_nick(user) == false) {
+					response.append("432 " + cl.nick + " " + user + " :Erroneous nickname");
+					break;
+				}
 				// check if channel exists
 				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
-					response.append("403 ");
-					response.append(cl.nick);
-					response.append(" :No such channel");
+					response.append("403 " + cl.nick + " :No such channel");
 					break;
 				}
 				// check if user is in server
 				if (Client::client_list.find(user) == Client::client_list.end()) {
-					response.append("401 ");
-					response.append(cl.nick);
-					response.append(" ");
-					response.append(user);
-					response.append(" :No such nick/channel");
+					response.append("401 " + cl.nick + " " + user + " :No such nick/channel");
 					break;
 				}
 				Channel & chnl = Channel::channel_list.at(chnlname);
 				// check if user is in channel
 				if (chnl.users.find(user) != chnl.users.end()) {
-					response.append("443 ");
-					response.append(cl.nick);
-					response.append(" ");
-					response.append(user);
-					response.append(" :is already on channel");
+					response.append("443 " + cl.nick + " " + user + " " + chnlname + " :is already on channel");
 					break;
 				}
 				// send invite
+				else if (chnl.invited.find(user) != chnl.invited.end()) {
+					response.append("443 " + cl.nick + " " + user + " " + chnlname + " :is already invited");
+					break;
+				}
 				chnl.invited.insert(user);
 			}
 			break;
@@ -655,8 +433,8 @@ void execute_cmd(Client &cl, Message & msg) {
 			 */
 			// get chnl and mode from params
 			if (!cl.registered) {
-				response.append("451 ");
-				response.append(" * :You have not registered"); // * is nick placeholder
+				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append(" * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size()  < 2) {
@@ -671,27 +449,24 @@ void execute_cmd(Client &cl, Message & msg) {
 				if (Client::client_list.find(chnlname) != Client::client_list.end()) {
 					break;
 				}
+				if (Channel::is_valid_channel(chnlname) == false) {
+					response.append("476 " + cl.nick + " :Bad channel mask");
+					break;
+				}
 				string modes = msg.param_list[1];
 				if (modes.length() == 0) {
-					response.append("461 ")
-							.append(cl.nick)
-							.append(" MODE :Not enough parameters");
+					response.append("461 " + cl.nick + " MODE :Not enough parameters");
 					break;
 				}
 				// check if channel exists
 				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
-					response.append("403 ")
-							.append(cl.nick)
-							.append(" :No such channel");
+					response.append("403 " + cl.nick + " :No such channel");
 					break;
 				}
 				Channel & chnl = Channel::channel_list.at(chnlname);
 				// check if client is oper
 				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
-					response.append("482 ")
-							.append(cl.nick)
-							.append(" " + chnlname)
-							.append(" :You're not a channel operator");
+					response.append("482 " + cl.nick + " " + chnlname + " :You're not a channel operator");
 					break;
 				}
 				// validate mode params. only accept i t k o and l
@@ -700,15 +475,10 @@ void execute_cmd(Client &cl, Message & msg) {
 					|| (modes[0] != '+' && modes[0] != '-')				// first char must be + or -
 					|| modes.find_first_of("itkol") == string::npos)		//	one of i t k o must be present
 				{
-					response.append("501 ")
-							.append(cl.nick)
-							.append(" :Unknown MODE flag");
+					response.append("501 " + cl.nick + " :Unknown MODE flag");
 					break;
 				}
-				// split modes into add and remove
-				// add modes
-
-				string mode_changes ="";
+				string mode_changes = "";
 				bool add = true;
 				bool prefixed = false;
 				for (size_t i = 0; i < modes.length(); ++i) {
@@ -753,11 +523,7 @@ void execute_cmd(Client &cl, Message & msg) {
 							if (msg.param_list.size() > 2) {
 								string oper = msg.param_list[2];
 								if (chnl.opers.find(oper) != chnl.opers.end()) {
-									response.append("441 ")
-											.append(cl.nick)
-											.append(" ")
-											.append(oper)
-											.append(" :They are already an operator");
+									response.append("441 " + cl.nick + " " + oper + " :They are already an operator");
 									break;
 								}
 								else if (chnl.users.find(oper) != chnl.users.end()) {
@@ -766,20 +532,13 @@ void execute_cmd(Client &cl, Message & msg) {
 										mode_changes.append("+");
 										prefixed = true;
 									}
-									mode_changes.append("o ");
-									mode_changes.append(oper);
+									mode_changes.append("o " + oper);
 								} else {
-									response.append("441 ")
-											.append(cl.nick)
-											.append(" ")
-											.append(oper)
-											.append(" :They aren't on that channel");
+									response.append("441 " + cl.nick + " " + oper + " :They aren't on that channel");
 									break;
 								}
 							} else {
-								response.append("461 ")
-										.append(cl.nick)
-										.append(" MODE :Not enough parameters");
+								response.append("461 " + cl.nick + " MODE :Not enough parameters");
 								break;
 							} 
 						} else if (modes[i] == 'l') {
@@ -788,7 +547,6 @@ void execute_cmd(Client &cl, Message & msg) {
 								int limit = std::atoi(msg.param_list[2].c_str());
 								if (limit <= 0)
 									break;
-								YEET limit ENDL;
 								chnl.user_limit = limit;
 								if (!prefixed) {
 									mode_changes.append("+");
@@ -798,9 +556,7 @@ void execute_cmd(Client &cl, Message & msg) {
 								ss << limit;
 								mode_changes.append("l " + ss.str());
 							} else {
-								response.append("461 ")
-										.append(cl.nick)
-										.append(" MODE :Not enough parameters");
+								response.append("461 " + cl.nick + " MODE :Not enough parameters");
 								break;
 							}
 						}
@@ -838,19 +594,13 @@ void execute_cmd(Client &cl, Message & msg) {
 										mode_changes.append("-");
 										prefixed = true;
 									}
-									mode_changes.append("o");
+									mode_changes.append("o " + oper);
 								} else {
-									response.append("441 ")
-											.append(cl.nick)
-											.append(" ")
-											.append(oper)
-											.append(" :They aren't on that channel");
+									response.append("441 " + cl.nick + " ");
 									break;
 								}
 							} else {
-								response.append("461 ")
-										.append(cl.nick)
-										.append(" MODE :Not enough parameters");
+								response.append("461 " + cl.nick + " MODE :Not enough parameters");
 								break;
 							}
 						} else if (modes[i] == 'l' && chnl.user_limit != 0) {
@@ -865,13 +615,7 @@ void execute_cmd(Client &cl, Message & msg) {
 					}
 				}
 				if (mode_changes.length()) {
-					string announcement = ":";
-					announcement.append(cl.fullname)
-								.append(" MODE ")
-								.append(chnlname)
-								.append(" ")
-								.append(mode_changes)
-								.append("\r\n");
+					string announcement = ":" + cl.fullname + " MODE " + chnlname + " " + mode_changes + "\r\n";
 					std::set<string>::iterator it = chnl.users.begin();
 					while (it != chnl.users.end()) {
 						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
