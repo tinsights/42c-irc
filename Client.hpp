@@ -15,17 +15,13 @@
 # define __CLIENT_HPP__
 # include "irc.hpp"
 
-/**
- * TODO: 
- * - Client.cpp
- * - OCF
-*/
 class Client {
 	public:
-		// string ip unnec. was playing.
 		Client(int fd, string ip);
-		// TODO: OCF format etc
 		~Client();
+
+		static bool	is_valid_nick(string nickname);
+		static bool	is_valid_user(string username);
 
 		// eventually private, with getters and setters etc:
 		int 	socket;
