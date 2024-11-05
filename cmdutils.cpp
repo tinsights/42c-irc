@@ -302,7 +302,12 @@ void execute_cmd(Client &cl, string &cmd) {
 					}
 					chnl.users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
-
+					// for other users 
+					string announcement = ":";
+						announcement.append(cl.fullname)
+									.append(" JOIN ")
+									.append(msg.params)
+									.append("\r\n");
 					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
 					response.append("353 ")
 							.append(cl.nick)
@@ -311,6 +316,9 @@ void execute_cmd(Client &cl, string &cmd) {
 							.append(" :");
 					std::set<string>::iterator it = chnl.users.begin();
 					while (it != chnl.users.end()) {
+						// send annoucnement message to all users in channel
+						// as per :nick!~realname@servername JOIN #1
+						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0); // prob should be a method of a class somewhere
 						// add @ prefix for ops
 						if (chnl.opers.find(*it) != chnl.opers.end()) {
 							response.append("@");
