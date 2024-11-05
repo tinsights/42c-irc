@@ -39,8 +39,8 @@ class Message {
 	string			prefix;
 	string			trailing;
 	string			params;
-	vector<string>	param_list;
-	bool	valid;
+	vector<string>		param_list;
+	bool			valid;
 	
 	private:
 	Message();
