@@ -304,10 +304,10 @@ void execute_cmd(Client &cl, string &cmd) {
 					cl.joined_channels.insert(msg.params);
 					// for other users 
 					string announcement = ":";
-						announcement.append(cl.fullname)
-									.append(" JOIN ")
-									.append(msg.params)
-									.append("\r\n");
+					announcement.append(cl.fullname)
+								.append(" JOIN ")
+								.append(msg.params)
+								.append("\r\n");
 					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
 					response.append("353 ")
 							.append(cl.nick)
