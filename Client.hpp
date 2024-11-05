@@ -15,17 +15,13 @@
 # define __CLIENT_HPP__
 # include "irc.hpp"
 
-/**
- * TODO: 
- * - Client.cpp
- * - OCF
-*/
 class Client {
 	public:
-		// string ip unnec. was playing.
-		Client(int fd, string ip) : socket(fd), ip_addr(ip), nick(""), user(""), host(""), server(""), realname(""), fullname(""), remainder(""), auth(false), registered(false), joined_channels() {};
-		// TODO: OCF format etc
-		~Client() {};
+		Client(int fd, string ip);
+		~Client();
+
+		static bool	is_valid_nick(string nickname);
+		static bool	is_valid_user(string username);
 
 		// eventually private, with getters and setters etc:
 		int 	socket;
@@ -47,7 +43,9 @@ class Client {
 		static std::map<int, Client &> connections;				// currently "global"	
 
 	private:
-		Client() {};
+		Client();
+		Client(const Client&);
+		Client&	operator=(const Client&);
 		
 };
 
