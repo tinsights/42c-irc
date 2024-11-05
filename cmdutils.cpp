@@ -586,11 +586,11 @@ void execute_cmd(Client &cl, Message & msg) {
 							.append(" :You're not a channel operator");
 					break;
 				}
-				// validate mode params. only accept i t k o
+				// validate mode params. only accept i t k o and l
 				// mode can be +i-t or +it, etc
-				if (modes.find_first_not_of("+-itko") != string::npos	// has other rubbish
+				if (modes.find_first_not_of("+-itkol") != string::npos	// has other rubbish
 					|| (modes[0] != '+' && modes[0] != '-')				// first char must be + or -
-					|| modes.find_first_of("itko") == string::npos)		//	one of i t k o must be present
+					|| modes.find_first_of("itkol") == string::npos)		//	one of i t k o must be present
 				{
 					response.append("501 ")	
 							.append(cl.nick)
@@ -664,6 +664,27 @@ void execute_cmd(Client &cl, Message & msg) {
 										.append(cl.nick)
 										.append(" MODE :Not enough parameters");
 								break;
+							} 
+						} else if (modes[i] == 'l') {
+							// add limit
+							if (msg.param_list.size() > 2) {
+								int limit = std::atoi(msg.param_list[2].c_str());
+								if (limit <= 0)
+									break;
+								YEET limit ENDL;
+								chnl.user_limit = limit;
+								if (!prefixed) {
+									mode_changes.append("+");
+									prefixed = true;
+								}
+								std::stringstream ss;
+								ss << limit;
+								mode_changes.append("l " + ss.str());
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
 							}
 						}
 					} else {
@@ -715,6 +736,14 @@ void execute_cmd(Client &cl, Message & msg) {
 										.append(" MODE :Not enough parameters");
 								break;
 							}
+						} else if (modes[i] == 'l' && chnl.user_limit != 0) {
+							// remove limit
+							chnl.user_limit = 0;
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("l");
 						}
 					}
 				}

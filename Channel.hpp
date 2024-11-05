@@ -19,7 +19,7 @@
 class Channel {
 	public:
 		Channel(string name) 
-			: name(name), opers(), users(), passwd(""), topic(""), invite_only(false), topic_protected(true), passwd_protected(false) {};
+			: name(name), opers(), users(), passwd(""), topic(""), invite_only(false), topic_protected(true), passwd_protected(false), user_limit(0) {};
 		~Channel() {};
 
 		// eventually private, lazy to do getters/setters for now:
@@ -37,7 +37,7 @@ class Channel {
 		bool 	invite_only;
 		bool	topic_protected;
 		bool	passwd_protected;
-		size_t	user_limit; // default to high number instead of toggling switch
+		size_t	user_limit; // default to 0 instead of toggling switch
 
 		static std::map<string, Channel & > channel_list;
 	private:
