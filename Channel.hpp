@@ -21,6 +21,9 @@ class Channel {
 		Channel(string name);
 		~Channel();
 
+		static bool	is_valid_channel(string channel);
+		static bool	is_valid_pass(string password);
+
 		// eventually private, lazy to do getters/setters for now:
 		string name;			//chn name. todo: validation
 

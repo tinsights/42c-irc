@@ -25,19 +25,13 @@ registered(false) {}
 bool	Client::is_valid_nick(string nickname) {
 	if (nickname.empty() || nickname.size() > 8)
 		return (false);
-	if (!std::isalpha(nickname[0]))
-		return (false);
-	for (int i = 1; i < nickname.size(); i++) {
-		if (!std::isdigit(nickname[i]) && !std::isalpha(nickname[i]) && nickname[i] != '-')
-			return (false);
-	}
 	return (true);
 }
 
 bool	Client::is_valid_user(string username) {
 	if (username.empty())
 		return (false);
-	for (int i = 0; i < username.size(); i++) {
+	for (unsigned long i = 0; i < username.size(); i++) {
 		if (username[i] == '\n' || username[i] == '\r' || username[i] == '\0'
 			|| username[i] == '@' || username[i] == ' ')
 			return (false);
