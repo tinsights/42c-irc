@@ -173,7 +173,7 @@ int main(void) {
 								/* -------------------------------------------------------------------------- */
 								/*                               EXECUTE COMMAND                              */
 								/* -------------------------------------------------------------------------- */
-								execute_cmd(cl, cmd); <--- big
+								execute_cmd(cl, cmd);
 								message.erase(0, idx + 2); // +2 bc of crlf
 								idx = message.find("\r\n", 0);
 							}
