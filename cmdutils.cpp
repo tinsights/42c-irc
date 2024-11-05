@@ -52,8 +52,9 @@ void execute_cmd(Client &cl, string &cmd) {
 		case 0:
 			/** PASS
 			 * Potential replies:
-			 * 		ERR_NEEDMOREPARAMS 		461
-			 * 		ERR_ALREADYREGISTERED 	462
+			 * 		ERR_NEEDMOREPARAMS 		461 DONE
+			 * 		ERR_ALREADYREGISTERED 	462 DONE
+			 * 		ERR_PASSWDMISMATCH		464 DONE
 			 * 
 			*/
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
