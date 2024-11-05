@@ -35,10 +35,12 @@ class Message {
 	~Message();
 
 	// eventually private, i think?
-	string	cmd;
-	string	prefix;
-	string	trailing;
-	string	params;
+	string			cmd;
+	string			prefix;
+	string			trailing;
+	string			params;
+	vector<string>		param_list;
+	bool			valid;
 	
 	private:
 	Message();
