@@ -300,24 +300,26 @@ void execute_cmd(Client &cl, string &cmd) {
 					cl.joined_channels.insert(msg.params);
 
 					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
-					response.append("353 ");
-					response.append(cl.nick);
-					response.append(" = ");
-					response.append(msg.params);
-					response.append(" :");
+					response.append("353 ")
+							.append(cl.nick)
+							.append(" = ")
+							.append(msg.params)
+							.append(" :");
 					std::set<string>::iterator it = Channel::channel_list.at(msg.params).users.begin();
 					while (it != Channel::channel_list.at(msg.params).users.end()) {
-						response.append(*it);
-						response.append(" ");
+						response.append(*it)
+								.append(" ");
 						++it;
 					}
 					// add CRLF and end of name list as per
 					// :server 366 nick CHNLNAME :End of /NAMES list.
-					response.append("\r\n366 ");
-					response.append(cl.nick);
-					response.append(" ");
-					response.append(msg.params);
-					response.append(" :End of /NAMES list.");
+					response.append("\r\n")
+							.append(servername)
+							.append("366 ")
+							.append(cl.nick)
+							.append(" ")
+							.append(msg.params)
+							.append(" :End of /NAMES list.");
 				} else {
 					// channel doesnt exist
 					Channel *newchnl = new Channel(msg.params);
