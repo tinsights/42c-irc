@@ -77,8 +77,6 @@ static void	count_params(string &params, string& trailing, vector<string>& param
 		param_list.push_back(param);
 		param.clear();
 	}
-	if (!trailing.empty())
-		param_list.push_back(trailing);
 	YEET BOLDRED << setw(20) << "Param count: " << 15 - available_params ENDL;
 }
 
