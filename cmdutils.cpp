@@ -199,8 +199,9 @@ void execute_cmd(Client &cl, Message & msg) {
 				 * 
 				*/
 			if (msg.params.length()) {
-				if (msg.params.find_first_of(' ') != string::npos) {
-					string recpt = msg.params.substr(0, msg.params.find_first_of(' '));
+				string recpt = msg.param_list[0];
+				string privmsg = msg.trailing;
+				if (privmsg.length()) {
 					if (Client::client_list.find(recpt) != Client::client_list.end()) {
 						string message;
 						message
@@ -550,6 +551,188 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * - Respond with appropriate messages
 			 */
 			// get chnl and mode from params
+			if (!cl.auth) {
+				response.append("451 ");
+				response.append(" * :You have not registered"); // * is nick placeholder
+				break;
+			}
+			else if (msg.param_list.size()  < 2) {
+				response.append("461 ");
+				response.append(cl.nick);
+				response.append(" MODE :Not enough parameters");
+				break;
+			} else {
+				// split params into channel and mode
+				string chnlname = msg.param_list[0];
+				string modes = msg.param_list[1];
+				if (modes.length() == 0) {
+					response.append("461 ")
+							.append(cl.nick)
+							.append(" MODE :Not enough parameters");
+					break;
+				}
+				// check if channel exists
+				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
+					response.append("403 ")
+							.append(cl.nick)
+							.append(" :No such channel");
+					break;
+				}
+				Channel & chnl = Channel::channel_list.at(chnlname);
+				// check if client is oper
+				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
+					response.append("482 ")
+							.append(cl.nick)
+							.append(" :You're not a channel operator");
+					break;
+				}
+				// validate mode params. only accept i t k o
+				// mode can be +i-t or +it, etc
+				if (modes.find_first_not_of("+-itko") != string::npos	// has other rubbish
+					|| (modes[0] != '+' && modes[0] != '-')				// first char must be + or -
+					|| modes.find_first_of("itko") == string::npos)		//	one of i t k o must be present
+				{
+					response.append("501 ")	
+							.append(cl.nick)
+							.append(" :Unknown MODE flag");
+					break;
+				}
+				// split modes into add and remove
+				// add modes
+				
+				string mode_changes ="";
+				bool add = true;
+				bool prefixed = false;
+				for (size_t i = 0; i < modes.length(); ++i) {
+					while (modes[i] == '+' || modes[i] == '-') {
+						prefixed = false;
+						add = modes[i] == '+';
+						++i;
+					}
+					if (add) {
+						if (modes[i] == 'i' && !chnl.invite_only) {
+							chnl.invite_only = true;
+							if (!prefixed) {
+								mode_changes.append("+");
+								prefixed = true;
+							}
+							mode_changes.append("i");
+						} else if (modes[i] == 't' && !chnl.topic_protected) {
+							chnl.topic_protected = true;
+							if (!prefixed) {
+								mode_changes.append("+");
+								prefixed = true;
+							}
+							mode_changes.append("t");
+						} else if (modes[i] == 'k' && !chnl.passwd_protected) {
+							if (msg.param_list.size() > 2) {
+								chnl.passwd = msg.param_list[2];
+								chnl.passwd_protected = true;
+								if (!prefixed) {
+									mode_changes.append("+");
+									prefixed = true;
+								}
+								mode_changes.append("k");
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						} else if (modes[i] == 'o') {
+							// add oper
+							// check if next param is present
+							if (msg.param_list.size() > 2) {
+								string oper = msg.param_list[2];
+								if (chnl.users.find(oper) != chnl.users.end()) {
+									chnl.opers.insert(oper);
+									if (!prefixed) {
+										mode_changes.append("+");
+										prefixed = true;
+									}
+									mode_changes.append("o ");
+								} else {
+									response.append("441 ")
+											.append(cl.nick)
+											.append(" ")
+											.append(oper)
+											.append(" :They aren't on that channel");
+									break;
+								}
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						}
+					} else {
+						if (modes[i] == 'i' && chnl.invite_only) {
+							chnl.invite_only = false;
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("i");
+						} else if (modes[i] == 't' && chnl.topic_protected) {
+							chnl.topic_protected = false;
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("t");
+						} else if (modes[i] == 'k' && chnl.passwd_protected) {
+							chnl.passwd_protected = false;
+							chnl.passwd.clear();
+							if (!prefixed) {
+								mode_changes.append("-");
+								prefixed = true;
+							}
+							mode_changes.append("k");
+						} else if (modes[i] == 'o') {
+							// remove oper
+							// check if next param is present
+							if (msg.param_list.size() > 2) {
+								string oper = msg.param_list[2];
+								if (chnl.opers.find(oper) != chnl.opers.end()) {
+									chnl.opers.erase(oper);
+									if (!prefixed) {
+										mode_changes.append("-");
+										prefixed = true;
+									}
+									mode_changes.append("o");
+								} else {
+									response.append("441 ")
+											.append(cl.nick)
+											.append(" ")
+											.append(oper)
+											.append(" :They aren't on that channel");
+									break;
+								}
+							} else {
+								response.append("461 ")
+										.append(cl.nick)
+										.append(" MODE :Not enough parameters");
+								break;
+							}
+						}
+					}
+				}
+				if (mode_changes.length()) {
+					string announcement = ":";
+					announcement.append(cl.fullname)
+								.append(" MODE ")
+								.append(chnlname)
+								.append(" ")
+								.append(mode_changes)
+								.append("\r\n");
+					std::set<string>::iterator it = chnl.users.begin();
+					while (it != chnl.users.end()) {
+						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0);
+						++it;
+					}
+				}
+			}
 			break;
 		default:
 			// Existing cases...
