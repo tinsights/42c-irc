@@ -52,8 +52,9 @@ void execute_cmd(Client &cl, string &cmd) {
 		case 0:
 			/** PASS
 			 * Potential replies:
-			 * 		ERR_NEEDMOREPARAMS 		461
-			 * 		ERR_ALREADYREGISTERED 	462
+			 * 		ERR_NEEDMOREPARAMS 		461 DONE
+			 * 		ERR_ALREADYREGISTERED 	462 DONE
+			 * 		ERR_PASSWDMISMATCH		464 DONE
 			 * 
 			*/
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
@@ -159,6 +160,11 @@ void execute_cmd(Client &cl, string &cmd) {
 				ss >> cl.host;
 				ss >> cl.server;
 				cl.realname = msg.trailing;
+			} else {
+				// ERR_NEEDMOREPARAMS	461
+				response.append("461 ")
+					.append(cl.nick)
+					.append(" USER :Not enough parameters");
 			}
 			YEET setw(20) << "USER: " << cl.user ENDL;
 			YEET setw(20) << "HOST: " << cl.host ENDL;
@@ -168,18 +174,20 @@ void execute_cmd(Client &cl, string &cmd) {
 			/* Client can send either NICK followed by USER, so either can trigger below, which should be refactored away: */
 			if (cl.auth && cl.nick.length() && cl.host.length() && cl.user.length() && !cl.registered) {
 				string fullname = "";
-				fullname.append(cl.nick);
-				fullname.append("!");
-				fullname.append(cl.user);
-				fullname.append("@");
-				fullname.append(cl.ip_addr);
+				fullname.append(cl.nick)
+					.append("!")
+					.append(cl.user)
+					.append("@")
+					.append(cl.ip_addr);
+
 				cl.fullname = fullname;
 				cl.registered = true;
+
 				Client::client_list.insert(std::pair<string, Client &>(cl.nick, cl));
-				response.append("001 ");
-				response.append(cl.nick);
-				response.append(" :Welcome to the Internet Relay Network ");
-				response.append(cl.fullname);
+				response.append("001 ")
+					.append(cl.nick)
+					.append(" :Welcome to the Internet Relay Network ")
+					.append(cl.fullname);
 			} else {
 				// cout << "auth: " << cl.auth << " nick: " << cl.nick << " host: " << cl.host << " user " << cl.user << endl;
 			}
@@ -259,14 +267,16 @@ void execute_cmd(Client &cl, string &cmd) {
 			 * 		ERR_INVITEONLYCHAN	473
 			 * 
 			 * 		RPL_TOPIC 332 && RPL_NAMEREPLY 353 <-- on success
+			 * 		DONE:	:server 353 NICK = CHNLNAME :list of nicknames // honestly what is the equals sign? idk im following liberachat
+			 *	 			:server 366 NICK CHNLNAME :End of /NAMES list.T
+			 				TODO: add @ prefix for ops
 			 * 
 			 *  TODO:
 			 * 		- validate chnl name i.e. params BADCHANMASK
 			 * 		- channel restrictions i.e. BADCHANNELKEY / INVITEONLYCHAN
-			 * 		- send proper reply to all to announce client joined channel
-			 * 		- send back RPL_TOPIC and RPL_NAMEREPLY
+			 * 	DOING:
+			 * 		 - send back RPL_TOPIC and RPL_NAMEREPLY
 			 * 		
-			 * 
 			*/
 			if (!cl.auth) {
 				/**
@@ -283,19 +293,78 @@ void execute_cmd(Client &cl, string &cmd) {
 			if (msg.params.length()) {
 				if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
 					// channel currently exists
-					if (Channel::channel_list.at(msg.params).users.find(cl.nick) != Channel::channel_list.at(msg.params).users.end() ){
+					Channel & chnl = Channel::channel_list.at(msg.params);
+
+					if (chnl.users.find(cl.nick) != chnl.users.end() ){
 						// user already in channel
 						// should send err msg
+						// apparently IRC servers do nothing here
 						break;
 					}
-					Channel::channel_list.at(msg.params).users.insert(cl.nick);
+					chnl.users.insert(cl.nick);
 					cl.joined_channels.insert(msg.params);
+					// for other users 
+					string announcement = ":";
+					announcement.append(cl.fullname)
+								.append(" JOIN ")
+								.append(msg.params)
+								.append("\r\n");
+					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
+					response.append("353 ")
+							.append(cl.nick)
+							.append(" = ")
+							.append(msg.params)
+							.append(" :");
+					std::set<string>::iterator it = chnl.users.begin();
+					while (it != chnl.users.end()) {
+						// send annoucnement message to all users in channel
+						// as per :nick!~realname@servername JOIN #1
+						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0); // prob should be a method of a class somewhere
+						// add @ prefix for ops
+						if (chnl.opers.find(*it) != chnl.opers.end()) {
+							response.append("@");
+						}
+						response.append(*it)
+								.append(" ");
+						++it;
+					}
+					// add CRLF and end of name list as per
+					// :server 366 nick CHNLNAME :End of /NAMES list.
+					response.append("\r\n")
+							.append(servername)
+							.append("366 ")
+							.append(cl.nick)
+							.append(" ")
+							.append(msg.params)
+							.append(" :End of /NAMES list.");
 				} else {
 					// channel doesnt exist
-					Channel *newchnl = new Channel(msg.params);
+					Channel *newchnl = new Channel(msg.params); // heap memory must be cleared. unless we set a static channel limit in main.
 					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, *newchnl));
+					// add user to opers list
 					newchnl->users.insert(cl.nick);
+					newchnl->opers.insert(cl.nick); // should be a public setter that access private members and checks that user is in channel.
 					cl.joined_channels.insert(msg.params);
+					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
+					response.append("353 ")
+							.append(cl.nick)
+							.append(" = ")
+							.append(msg.params)
+							.append(" :");
+					// we know the only user in the channel is the one who joined
+					// and they are an oper
+					response.append("@")
+							.append(cl.nick)
+							.append(" ");
+					// add CRLF and end of name list as per
+					// :server 366 nick CHNLNAME :End of /NAMES list.
+					response.append("\r\n")
+							.append(servername)
+							.append("366 ")
+							.append(cl.nick)
+							.append(" ")
+							.append(msg.params)
+							.append(" :End of /NAMES list.");
 				}
 			} else {
 				// not enough params
