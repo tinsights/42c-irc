@@ -27,6 +27,7 @@
 # include <map>
 # include <vector>
 # include <set>
+# include <stack>
 # include <algorithm>
 
 /* system i/o, strings, etc */
@@ -34,7 +35,8 @@
 # include <iomanip>
 # include <sstream>
 # include <string>
-# include <cstring> // um, damn i should really keep track. why do i need this?
+# include <cstring>
+# include <cstdio>
 # include "colours.hpp"
 
 using std::cout;
@@ -45,6 +47,9 @@ using std::setw;
 
 using std::string;
 using std::vector;
+using std::map;
+using std::set;
+using std::stack;
 
 /* Forward declaration.. can be removed later w proper .cpp class files*/
 class Client;

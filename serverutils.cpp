@@ -12,10 +12,9 @@
 
 #include "irc.hpp"
 
-#define PORT "6667"
 #define MAX_QUEUE 10
 
-int get_server_socket() {
+int get_server_socket(const char * port) {
 	/**
 	 * //OLD WAY! :
 	 * sockaddr_in server_addr = {
@@ -34,7 +33,7 @@ int get_server_socket() {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	getaddrinfo(NULL, PORT, &hints, &res);
+	getaddrinfo(NULL, port, &hints, &res);
 	
 	/**
 	 * #include <sys/types.h>
@@ -48,12 +47,16 @@ int get_server_socket() {
 	 * TODO: error checking (i.e. check return value)
 	*/
 	server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (server_socket == -1) {
+		perror("socket");
+		exit(1);
+	}
 
-	/**
-	 * TODO: understand...
-	*/
 	int optval = 1;
-	setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+	if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval)) {
+		perror("setsockopt");
+		exit(1);
+	}
 	/**
 	 * int bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen);
 	 * 
@@ -63,7 +66,10 @@ int get_server_socket() {
 	 * 
 	 * TODO: error checking (i.e. check return value)
 	*/
-	bind(server_socket, res->ai_addr, res->ai_addrlen);
+	if (bind(server_socket, res->ai_addr, res->ai_addrlen)) {
+		perror("bind");
+		exit(1);
+	}
 
 	/**
 	 * int listen(int s, int backlog);
@@ -77,14 +83,15 @@ int get_server_socket() {
 	 * 
 	 * TODO: error checking (i.e. check return value)
 	*/
-	listen(server_socket, MAX_QUEUE);
+	if (listen(server_socket, MAX_QUEUE)) {
+		perror("listen");
+		exit(1);
+	}
 
 	freeaddrinfo(res);
 	return server_socket;
 }
 
-/* AI generated, was having fun, probably dont need */
-#include <cstdio>
 void convertInAddrToString(struct in_addr addr, char *buffer, size_t bufferSize) {
 	snprintf(buffer, bufferSize, "%u.%u.%u.%u", 
 		(addr.s_addr & 0xFF), 

@@ -29,6 +29,7 @@ class Channel {
 
 		std::set<string> opers; // nicks of users who are operator
 		std::set<string> users;
+		std::set<string> invited; // nicks of users who are invited	
 
 		/**
 		 * TODO: all of the below
@@ -39,7 +40,7 @@ class Channel {
 		bool 	invite_only;
 		bool	topic_protected;
 		bool	passwd_protected;
-		size_t	user_limit; // default to high number instead of toggling switch
+		size_t	user_limit; // default to 0 instead of toggling switch
 
 		static std::map<string, Channel & > channel_list;
 	private:

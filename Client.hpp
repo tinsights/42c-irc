@@ -22,8 +22,9 @@ class Client {
 
 		static bool	is_valid_nick(string nickname);
 		static bool	is_valid_user(string username);
-
-		// eventually private, with getters and setters etc:
+		static string password;
+		static string port;
+		
 		int 	socket;
 		string	ip_addr;	// unnec.
 		string	nick;		// uuid. impt!
@@ -36,11 +37,12 @@ class Client {
 
 		bool	auth;		// if password provided was correct
 		bool	registered;	// if successfully registered with unique NICK and full USER details
+		bool	ready_to_register() const;
 
 		std::set<string> joined_channels;
 
 		static std::map<string, Client &> client_list;			// currently "global"
-		// static std::map<string, std::set<string> > channels;	// likely will be refactored
+		static std::map<int, Client &> connections;				// currently "global"	
 
 	private:
 		Client();
