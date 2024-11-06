@@ -158,6 +158,7 @@ int main(int ac, char **av) {
 						string message(buffer);
 						// reconstruct from remainder if present
 						if (cl.remainder.length()) {
+							YEET BOLDYELLOW << "Inserting Remainder: "	<< cl.remainder ENDL;
 							message.insert(0, cl.remainder);
 						}
 						// check if message has CRLF
