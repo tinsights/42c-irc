@@ -12,21 +12,28 @@
 
 NAME = ircserv
 
-SRCS = main.cpp serverutils.cpp cmdutils.cpp Message.cpp Client.cpp Channel.cpp
-OBJS = $(SRCS:.cpp=.o)
-DEPS = $(SRCS:.cpp=.d)
+SRCDIR = srcs/
+CLASSDIR = srcs/classes/
+INCDIR = includes/ srcs/classes/
+
+SRCS = $(addprefix $(SRCDIR), main.cpp serverutils.cpp cmdutils.cpp)
+CLASSES = $(addprefix $(CLASSDIR), Message.cpp Client.cpp Channel.cpp)
+INCLUDES = $(addprefix -I, $(INCDIR))
+
+OBJS = $(SRCS:.cpp=.o) $(CLASSES:.cpp=.o)
+DEPS = $(SRCS:.cpp=.d) $(CLASSES:.cpp=.d)
 
 CC = c++
-CFLAGS = -Wall -Werror -Wextra -g -std=c++98
+CFLAGS = -Wall -Werror -Wextra -g -O3 -std=c++98
 CPPFLAGS = -MMD -MP
 
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
+	$(CC) $(CFLAGS) $(OBJS)  -o $(NAME)
 
 %.o: %.cpp
-	 $(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	 $(CC) $(CFLAGS) $(CPPFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(DEPS)
