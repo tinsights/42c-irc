@@ -35,7 +35,7 @@ int main(int ac, char **av) {
 		std::cerr << "Usage: " << av[0] << " <port> <password>" << std::endl;
 		return 1;
 	} else if (std::strlen(av[1]) < 4 || std::strlen(av[1]) > 5 || string(av[1]).find_first_not_of("0123456789") != std::string::npos) {
-			std::cerr << "Invalid port number." << std::endl;
+			std::cerr << "Invalid port number. Must be between 1024 and 65535." << std::endl;
 			return 1;
 	} else {
 		int port = std::atoi(av[1]);

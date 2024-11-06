@@ -60,8 +60,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 1: // NICK
 			if (!cl.auth) {
-				response.append("451 " + cl.nick + " * :You have not registered");
-				response.append(" * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			if (msg.params.length()) {
@@ -92,8 +91,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 2: // USER
 			if (!cl.auth) {
-				response.append("451 " + cl.nick + " * :You have not registered");
-				response.append(" * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			if (msg.params.length() && msg.trailing.length()) {
@@ -182,8 +180,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 *
 			*/
 			if (!cl.registered) {
-				response.append("451 " + cl.nick + " * :You have not registered");
-				response.append(" * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			if (msg.params.length()) {
@@ -275,7 +272,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * Response:
 			 * 	:<nick>!<user>>@<host> QUIT :Client Quit
 			*/
-			response.append(servername + "QUIT :Client Quit");
+			response.append(servername + "QUIT :Client Quit\r\n");
 			send(cl.socket, response.c_str(), response.length(), 0);
 			response.erase(response.begin(), response.end());
 			break;
@@ -289,7 +286,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 * 		ERR_CHANOPRIVSNEEDED 482 <-- not operator
 			*/
 			if (!cl.registered) {
-				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size() < 2) { // <channel> <user>
@@ -336,7 +333,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 7: // TOPIC
 			if (!cl.registered) {
-				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			if (msg.params.length()) {
@@ -381,7 +378,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			break;
 		case 8: // INVITE
 			if (!cl.registered) {
-				response.append("451 " + cl.nick + " * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size() < 2) {
@@ -432,8 +429,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			 */
 			// get chnl and mode from params
 			if (!cl.registered) {
-				response.append("451 " + cl.nick + " * :You have not registered");
-				response.append(" * :You have not registered");
+				response.append("451 * :You have not registered");
 				break;
 			}
 			else if (msg.param_list.size()  < 2) {
