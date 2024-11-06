@@ -55,8 +55,13 @@ static void	get_cmd(string &raw, string &cmd) {
 static void	get_params(string &raw, string &params, string &trailing) {
 	if (raw.length()) {
 		size_t	trailing_sep = raw.find(" :");
-		if (trailing_sep == string::npos)
-			params = raw;
+		if (trailing_sep == string::npos) {
+			size_t space_idx = raw.size() - 1;
+			while (space_idx && raw[space_idx] == ' ')
+				space_idx--;
+			params = raw.substr(0, space_idx + 1);
+			raw.clear();
+		}
 		else {
 			size_t space_idx = trailing_sep;
 			while (space_idx > 0 && raw[space_idx] == ' ')
