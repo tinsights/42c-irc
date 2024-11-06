@@ -155,22 +155,22 @@ void execute_cmd(Client &cl, Message & msg) {
 				break;
 			}
 			if (msg.params.length()) {
-				if (Channel::is_valid_channel(msg.params) == false) {
+				if (Channel::is_valid_channel(msg.param_list[0]) == false) {
 					response.append("476 " + cl.nick + " :Bad channel mask");
 					break;
 				}
-				else if (Channel::channel_list.find(msg.params) != Channel::channel_list.end()) {
-					Channel & chnl = Channel::channel_list.at(msg.params);
+				else if (Channel::channel_list.find(msg.param_list[0]) != Channel::channel_list.end()) {
+					Channel & chnl = Channel::channel_list.at(msg.param_list[0]);
 
 					if (chnl.users.find(cl.nick) != chnl.users.end() ){
 						break;
 					}
-					else if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
+					if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
 						// user not invited
 						response.append("473 " + cl.nick + " " + msg.params + " :Cannot join channel, requires invite. (+i)");
 						break;
 					}
-					else if (chnl.passwd_protected) {
+					if (chnl.passwd_protected) {
 						if (msg.param_list.size() < 2) {
 							// channel has password
 							// send ERR_BADCHANNELKEY
@@ -181,9 +181,8 @@ void execute_cmd(Client &cl, Message & msg) {
 							response.append("464 " + cl.nick + " " + msg.params + " :Password incorrect.");
 							break;
 						}
-						break;
 					}
-					else if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
+					if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
 						// channel is full
 						response.append("471 " + cl.nick + " " + msg.params + " :Cannot join channel, channel is full.");
 						break;
@@ -370,12 +369,16 @@ void execute_cmd(Client &cl, Message & msg) {
 					response.append("403 " + cl.nick + " :No such channel");
 					break;
 				}
+				Channel & chnl = Channel::channel_list.at(chnlname);
+				if (chnl.opers.find(cl.nick) == chnl.opers.end()) {
+					response.append("482 " + cl.nick + " " + chnlname + " :You're not a channel operator");
+					break;
+				}
 				// check if user is in server
 				if (Client::client_list.find(user) == Client::client_list.end()) {
 					response.append("401 " + cl.nick + " " + user + " :No such nick/channel");
 					break;
 				}
-				Channel & chnl = Channel::channel_list.at(chnlname);
 				// check if user is in channel
 				if (chnl.users.find(user) != chnl.users.end()) {
 					response.append("443 " + cl.nick + " " + user + " " + chnlname + " :is already on channel");
@@ -395,9 +398,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				break;
 			}
 			else if (msg.param_list.size()  < 2) {
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" MODE :Not enough parameters");
+				response.append("461 " + cl.nick + " MODE :Not enough parameters");
 				break;
 			} else {
 				// split params into channel and mode

@@ -48,12 +48,14 @@ int get_server_socket(const char * port) {
 	*/
 	server_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (server_socket == -1) {
+		freeaddrinfo(res);
 		perror("socket");
 		exit(1);
 	}
 
 	int optval = 1;
 	if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval)) {
+		freeaddrinfo(res);
 		perror("setsockopt");
 		exit(1);
 	}
@@ -67,6 +69,7 @@ int get_server_socket(const char * port) {
 	 * TODO: error checking (i.e. check return value)
 	*/
 	if (bind(server_socket, res->ai_addr, res->ai_addrlen)) {
+		freeaddrinfo(res);
 		perror("bind");
 		exit(1);
 	}
@@ -85,6 +88,7 @@ int get_server_socket(const char * port) {
 	*/
 	if (listen(server_socket, MAX_QUEUE)) {
 		perror("listen");
+		freeaddrinfo(res);
 		exit(1);
 	}
 
