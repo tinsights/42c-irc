@@ -50,7 +50,7 @@ bool Client::ready_to_register() const {
 }
 
 bool	Client::is_valid_nick(string nickname) {
-	if (nickname.empty() || nickname.size() > 8)
+	if (nickname.empty() || nickname.size() > 16)
 		return (false);
 	if (!is_special(nickname[0]) && !std::isalpha(nickname[0]))
 		return (false);

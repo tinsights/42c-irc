@@ -47,15 +47,11 @@ void execute_cmd(Client &cl, Message & msg) {
 					}
 				} else {
 					// already registered
-					response.append("462 ");
-					response.append(cl.nick);
-					response.append(" :You may not reregister");
+					response.append("462 " + cl.nick + " :You may not reregister");
 				}
 			} else {
 				// not enough params
-				response.append("461 ");
-				response.append(cl.nick);
-				response.append(" PASS :Not enough parameters");
+				response.append("461 " + cl.nick + " PASS :Not enough parameters");
 			}
 			break;
 		case 1: // NICK
@@ -65,15 +61,11 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			if (msg.params.length()) {
 				if (!Client::is_valid_nick(msg.params)) {
-					response.append("432 * ");
-					response.append(msg.params);
-					response.append(" :Erroneous nickname");
+					response.append("432 * " + msg.params + " :Erroneous nickname");
 					break;
 				}
 				else if (Client::client_list.find(msg.params) != Client::client_list.end() ) {
-					response.append("433 * ");
-					response.append(msg.params);
-					response.append(" :Nickname is already in use.");
+					response.append("433 * " + msg.params + " :Nickname is already in use.");
 				} else {
 					cl.nick = msg.params;
 				}
@@ -98,9 +90,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				std::stringstream ss(msg.params);
 				ss >> cl.user;
 				if (Client::is_valid_user(cl.user) == false) {
-					response.append("501 ");
-					response.append(cl.nick);
-					response.append(" :Invalid username");
+					response.append("501 " + cl.nick + " :Invalid username");
 					cl.user.clear();
 					break;
 				}
@@ -160,25 +150,6 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 4: // JOIN
-			/**
-			 *  Potential replies:
-			 * 		ERR_NEEDMOREPARAMS	461
-			 * 		ERR_BADCHANMASK 	476 <-- channel format wrong
-			 * 		ERR_BADCHANNELKEY 	475 <-- wrong channel password, if req
-			 * 		ERR_INVITEONLYCHAN	473
-			 *
-			 * 		RPL_TOPIC 332 && RPL_NAMEREPLY 353 <-- on success
-			 * 		DONE:	:server 353 NICK = CHNLNAME :list of nicknames // honestly what is the equals sign? idk im following liberachat
-			 *	 			:server 366 NICK CHNLNAME :End of /NAMES list.T
-			 				TODO: add @ prefix for ops
-			 *
-			 *  TODO:
-			 * 		- validate chnl name i.e. params BADCHANMASK
-			 * 		- channel restrictions i.e. BADCHANNELKEY / INVITEONLYCHAN
-			 * 	DOING:
-			 * 		 - send back RPL_TOPIC and RPL_NAMEREPLY
-			 *
-			*/
 			if (!cl.registered) {
 				response.append("451 * :You have not registered");
 				break;
@@ -222,12 +193,11 @@ void execute_cmd(Client &cl, Message & msg) {
 					// for other users
 					string announcement = ":";
 					announcement.append(cl.fullname + " JOIN " + msg.params + "\r\n");
-					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
+
 					response.append("353 " + cl.nick + " = " + msg.params + " :");
 					std::set<string>::iterator it = chnl.users.begin();
 					while (it != chnl.users.end()) {
 						// send annoucnement message to all users in channel
-						// as per :nick!~realname@servername JOIN #1
 						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0); // prob should be a method of a class somewhere
 						// add @ prefix for ops
 						if (chnl.opers.find(*it) != chnl.opers.end()) {
@@ -236,8 +206,6 @@ void execute_cmd(Client &cl, Message & msg) {
 						response.append(*it + " ");
 						++it;
 					}
-					// add CRLF and end of name list as per
-					// :server 366 nick CHNLNAME :End of /NAMES list.
 					response.append("\r\n" + servername + "366 " + cl.nick + " " + msg.params + " :End of /NAMES list.");
 					// add RPL_TOPIC
 					if (chnl.topic.length()) {
@@ -276,15 +244,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			send(cl.socket, response.c_str(), response.length(), 0);
 			response.erase(response.begin(), response.end());
 			break;
-		case 6: // KICK (in progress)
-			/**
-			 *  Potential replies:
-			 * 		ERR_NEEDMOREPARAMS 461
-			 * 		ERR_NOSUCHCHANNEL 403
-			 * 		ERR_BADCHANMASK  476 <--> bad channel format
-			 * 		ERR_NOTONCHANNEL 442
-			 * 		ERR_CHANOPRIVSNEEDED 482 <-- not operator
-			*/
+		case 6: // KICK
 			if (!cl.registered) {
 				response.append("451 * :You have not registered");
 				break;
@@ -420,14 +380,6 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 9: //MODE
-			/**
-			 * TODO: Implement MODE command functionality
-			 * - Check if user is in a channel
-			 * - Check if the user is an operator
-			 * - Set the mode for the channel
-			 * - Respond with appropriate messages
-			 */
-			// get chnl and mode from params
 			if (!cl.registered) {
 				response.append("451 * :You have not registered");
 				break;
@@ -619,14 +571,17 @@ void execute_cmd(Client &cl, Message & msg) {
 				}
 			}
 			break;
+		case 10: // PING
+			response.append("PONG " + servername + msg.trailing);
+			break;
 		default:
 			// Existing cases...
-			// currently ignore PING and MODE that are automatically sent by irssi
+			// currently ignore PING automatically sent by irssi
 			// so as to avoid confusing "PING: unknown command"	 on client side
 			break;
 	}
 	if (response.length() > servername.length()) {
-		response.append("\r\n"); // if we have a response class, response.send(Client & cl)) can append CRLF
+		response.append("\r\n");
 		YEET BOLDGREEN << setw(20) << "RESPONSE: " << response ENDL;
 		send(cl.socket, response.c_str(), response.length(), 0);
 		response.erase();

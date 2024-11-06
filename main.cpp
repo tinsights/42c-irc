@@ -140,12 +140,12 @@ int main(int ac, char **av) {
 							}
 							// remove from nickname list
 							Client::client_list.erase(cl.nick);
-							delete &cl;
 						} else {
 							YEET BOLDBLUE << cl.auth << " " << cl.nick ENDL;
 						}
 				
 						close(fds[i].fd);
+						delete &cl;
 						Client::connections.erase(fds[i].fd);
 						fds[i].fd = -1;
 						fd_count--;
