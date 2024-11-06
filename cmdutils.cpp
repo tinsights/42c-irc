@@ -451,7 +451,12 @@ void execute_cmd(Client &cl, Message & msg) {
 							mode_changes.append("t");
 						} else if (modes[i] == 'k' && !chnl.passwd_protected) {
 							if (msg.param_list.size() > 2) {
-								chnl.passwd = msg.param_list[2];
+								string passwd = msg.param_list[2];
+								if (Channel::is_valid_pass(passwd) == false) {
+									response.append("475 " + cl.nick + " " + chnlname + " :Bad channel key");
+									break;
+								}
+								chnl.passwd = passwd;
 								chnl.passwd_protected = true;
 								if (!prefixed) {
 									mode_changes.append("+");
