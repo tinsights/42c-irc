@@ -1,4 +1,21 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Client.cpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: tjegades <tjegades@student.42singapor      +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2024/11/06 07:51:33 by tjegades          #+#    #+#             */
+/*   Updated: 2024/11/06 07:51:34 by tjegades         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "Client.hpp"
+
+std::map<int, Client &> Client::connections;
+std::map<string, Client &> Client::client_list;
+string Client::password = "";
+string Client::port = "";
 
 Client::Client() {}
 

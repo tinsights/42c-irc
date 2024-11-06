@@ -17,7 +17,6 @@
 #include "Channel.hpp"
 
 #define NUM_CMDS 11
-#define PASSWD "hitchhiker"
 
 void execute_cmd(Client &cl, Message & msg) {
 	string cmds[NUM_CMDS] = {"PASS", "NICK", "USER", "PRIVMSG", "JOIN", "QUIT", "KICK", "TOPIC", "INVITE", "MODE", "PING"};
@@ -42,7 +41,7 @@ void execute_cmd(Client &cl, Message & msg) {
 			YEET BOLDRED << "\tPASS: " << msg.params ENDL;
 			if (msg.params.length()) {
 				if (cl.registered == false) {
-					cl.auth = msg.params == PASSWD;
+					cl.auth = msg.params == Client::password;
 					if (!cl.auth) {
 						response.append("464 * :Password incorrect");
 					}

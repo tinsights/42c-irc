@@ -22,8 +22,9 @@ class Client {
 
 		static bool	is_valid_nick(string nickname);
 		static bool	is_valid_user(string username);
-
-		// eventually private, with getters and setters etc:
+		static string password;
+		static string port;
+		
 		int 	socket;
 		string	ip_addr;	// unnec.
 		string	nick;		// uuid. impt!
