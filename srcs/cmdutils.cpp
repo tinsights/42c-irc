@@ -255,8 +255,7 @@ void execute_cmd(Client &cl, Message & msg) {
 				break;
 			}
 			else {// get chnl and user from params
-				string chnlname = msg.param_list[0];
-				string user = msg.param_list[1];
+				string chnlname = msg.param_list[0], user = msg.param_list[1];
 				// check if channel exists
 				if (Channel::channel_list.find(chnlname) == Channel::channel_list.end()) {
 					response.append("403 " + cl.nick + " :No such channel");
@@ -283,6 +282,17 @@ void execute_cmd(Client &cl, Message & msg) {
 				}
 				// remove channel from user's joined channels
 				cl.joined_channels.erase(chnlname);
+
+				if (cl.nick == user) { // if he is kicking himself
+					if (chnl.users.size() == 1) {
+						Channel::channel_list.erase(chnlname);
+						delete &chnl;
+						break;
+					}
+					else if (chnl.opers.size() == 1) {
+						chnl.opers.insert(*chnl.users.begin());
+					}
+				}
 				// kick user
 				chnl.users.erase(user);
 				// if user is in invite list, remove

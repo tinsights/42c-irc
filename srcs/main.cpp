@@ -29,6 +29,15 @@ void handler(int sig) {
 
 #define MAX_CONNS 100
 
+bool isAlnumString(string str) {
+	for (size_t i = 0; i < str.length(); ++i) {
+		if (!std::isalnum(str[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
 int main(int ac, char **av) {
 
 	if (ac != 3) {
@@ -44,7 +53,7 @@ int main(int ac, char **av) {
 			return 1;
 		}
 		string passwd = av[2];
-		if (passwd.empty()) {
+		if (passwd.length() < 3 || !isAlnumString(passwd)) {
 			std::cerr << "Invalid password." << std::endl;
 			return 1;
 		}
