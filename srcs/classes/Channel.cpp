@@ -32,7 +32,8 @@ passwd(""),
 topic(""),
 invite_only(false),
 topic_protected(true),
-passwd_protected(false) {}
+passwd_protected(false),
+user_limit(0) {}
 
 bool	Channel::is_valid_channel(string channel) {
 	if (channel.empty() || channel.size() > 50)
