@@ -27,7 +27,7 @@ void handler(int sig) {
 	}
 }
 
-#define MAX_CONNS 100
+#define MAX_CONNS 10
 
 bool isAlnumString(string str) {
 	for (size_t i = 0; i < str.length(); ++i) {

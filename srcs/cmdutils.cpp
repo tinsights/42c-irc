@@ -163,6 +163,7 @@ void execute_cmd(Client &cl, Message & msg) {
 					Channel & chnl = Channel::channel_list.at(msg.param_list[0]);
 
 					if (chnl.users.find(cl.nick) != chnl.users.end() ){
+						YEET BOLDYELLOW << cl.nick << " is already in " << msg.params ENDL;
 						break;
 					}
 					if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
@@ -188,7 +189,7 @@ void execute_cmd(Client &cl, Message & msg) {
 						break;
 					}
 					chnl.users.insert(cl.nick);
-					cl.joined_channels.insert(msg.params);
+					cl.joined_channels.insert(msg.param_list[0]);
 					// for other users
 					string announcement = ":";
 					announcement.append(cl.fullname + " JOIN " + msg.params + "\r\n");
