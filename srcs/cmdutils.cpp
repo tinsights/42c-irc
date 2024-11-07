@@ -150,90 +150,94 @@ void execute_cmd(Client &cl, Message & msg) {
 			}
 			break;
 		case 4: // JOIN
-			if (!cl.registered) {
-				response.append("451 * :You have not registered");
-				break;
-			}
-			if (msg.params.length()) {
-				if (Channel::is_valid_channel(msg.param_list[0]) == false) {
-					response.append("476 " + cl.nick + " :Bad channel mask");
+			{
+				string chnlname = msg.param_list.size() ? msg.param_list[0] : "";
+
+				if (!cl.registered) {
+					response.append("451 * :You have not registered");
 					break;
 				}
-				else if (Channel::channel_list.find(msg.param_list[0]) != Channel::channel_list.end()) {
-					Channel & chnl = Channel::channel_list.at(msg.param_list[0]);
+				else if (chnlname.length()) {
+					if (Channel::is_valid_channel(chnlname) == false) {
+						response.append("476 " + cl.nick + " :Bad channel mask");
+						break;
+					}
+					if (Channel::channel_list.find(msg.param_list[0]) != Channel::channel_list.end()) {
+						Channel & chnl = Channel::channel_list.at(msg.param_list[0]);
 
-					if (chnl.users.find(cl.nick) != chnl.users.end() ){
-						YEET BOLDYELLOW << cl.nick << " is already in " << msg.params ENDL;
-						break;
-					}
-					if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
-						// user not invited
-						response.append("473 " + cl.nick + " " + msg.params + " :Cannot join channel, requires invite. (+i)");
-						break;
-					}
-					if (chnl.passwd_protected) {
-						if (msg.param_list.size() < 2) {
-							// channel has password
-							// send ERR_BADCHANNELKEY
-							response.append("475 " + cl.nick + " " + msg.params + " :Cannot join channel, requires password. (+k)");
-							break;
-						} else if (msg.param_list[1] != chnl.passwd) {
-							// wrong password
-							response.append("464 " + cl.nick + " " + msg.params + " :Password incorrect.");
+						if (chnl.users.find(cl.nick) != chnl.users.end() ){
+							YEET BOLDYELLOW << cl.nick << " is already in " << chnlname ENDL;
 							break;
 						}
-					}
-					if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
-						// channel is full
-						response.append("471 " + cl.nick + " " + msg.params + " :Cannot join channel, channel is full.");
-						break;
-					}
-					chnl.users.insert(cl.nick);
-					cl.joined_channels.insert(msg.param_list[0]);
-					// for other users
-					string announcement = ":";
-					announcement.append(cl.fullname + " JOIN " + msg.params + "\r\n");
-
-					response.append("353 " + cl.nick + " = " + msg.params + " :");
-					std::set<string>::iterator it = chnl.users.begin();
-					while (it != chnl.users.end()) {
-						// send annoucnement message to all users in channel
-						send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0); // prob should be a method of a class somewhere
-						// add @ prefix for ops
-						if (chnl.opers.find(*it) != chnl.opers.end()) {
-							response.append("@");
+						if (chnl.invite_only && chnl.invited.find(cl.nick) == chnl.invited.end()) {
+							// user not invited
+							response.append("473 " + cl.nick + " " + chnlname + " :Cannot join channel, requires invite. (+i)");
+							break;
 						}
-						response.append(*it + " ");
-						++it;
-					}
-					response.append("\r\n" + servername + "366 " + cl.nick + " " + msg.params + " :End of /NAMES list.");
-					// add RPL_TOPIC
-					if (chnl.topic.length()) {
-						response.append("\r\n" + servername + "332 " + cl.nick + " " + msg.params + " :" + chnl.topic);
+						if (chnl.passwd_protected) {
+							if (msg.param_list.size() < 2) {
+								// channel has password
+								// send ERR_BADCHANNELKEY
+								response.append("475 " + cl.nick + " " + chnlname + " :Cannot join channel, requires password. (+k)");
+								break;
+							} else if (msg.param_list[1] != chnl.passwd) {
+								// wrong password
+								response.append("464 " + cl.nick + " " + chnlname + " :Password incorrect.");
+								break;
+							}
+						}
+						if (chnl.user_limit && chnl.users.size() >= chnl.user_limit) {
+							// channel is full
+							response.append("471 " + cl.nick + " " + chnlname + " :Cannot join channel, channel is full.");
+							break;
+						}
+						chnl.users.insert(cl.nick);
+						cl.joined_channels.insert(msg.param_list[0]);
+						// for other users
+						string announcement = ":";
+						announcement.append(cl.fullname + " JOIN " + chnlname + "\r\n");
+
+						response.append("353 " + cl.nick + " = " + chnlname + " :");
+						std::set<string>::iterator it = chnl.users.begin();
+						while (it != chnl.users.end()) {
+							// send annoucnement message to all users in channel
+							send(Client::client_list.at(*it).socket, announcement.c_str(), announcement.length(), 0); // prob should be a method of a class somewhere
+							// add @ prefix for ops
+							if (chnl.opers.find(*it) != chnl.opers.end()) {
+								response.append("@");
+							}
+							response.append(*it + " ");
+							++it;
+						}
+						response.append("\r\n" + servername + "366 " + cl.nick + " " + chnlname + " :End of /NAMES list.");
+						// add RPL_TOPIC
+						if (chnl.topic.length()) {
+							response.append("\r\n" + servername + "332 " + cl.nick + " " + chnlname + " :" + chnl.topic);
+						}
+					} else {
+						// channel doesnt exist
+						Channel *newchnl = new Channel(chnlname);
+						Channel::channel_list.insert(std::pair<string, Channel & >(chnlname, *newchnl));
+						// add user to opers list
+						newchnl->users.insert(cl.nick);
+						newchnl->opers.insert(cl.nick); // should be a public setter that access private members and checks that user is in channel.
+						cl.joined_channels.insert(chnlname);
+						// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
+						response.append("353 " + cl.nick + " = " + chnlname + " :");
+						// we know the only user in the channel is the one who joined
+						// and they are an oper
+						response.append("@" + cl.nick + " ");
+						// add CRLF and end of name list as per
+						// :server 366 nick CHNLNAME :End of /NAMES list.
+						response.append("\r\n" + servername + "366 " + cl.nick + " " + chnlname + " :End of /NAMES list.");
 					}
 				} else {
-					// channel doesnt exist
-					Channel *newchnl = new Channel(msg.params);
-					Channel::channel_list.insert(std::pair<string, Channel & >(msg.params, *newchnl));
-					// add user to opers list
-					newchnl->users.insert(cl.nick);
-					newchnl->opers.insert(cl.nick); // should be a public setter that access private members and checks that user is in channel.
-					cl.joined_channels.insert(msg.params);
-					// create response as per :server 353 NICK = CHNNLNAME :LIST OF USERS
-					response.append("353 " + cl.nick + " = " + msg.params + " :");
-					// we know the only user in the channel is the one who joined
-					// and they are an oper
-					response.append("@" + cl.nick + " ");
-					// add CRLF and end of name list as per
-					// :server 366 nick CHNLNAME :End of /NAMES list.
-					response.append("\r\n" + servername + "366 " + cl.nick + " " + msg.params + " :End of /NAMES list.");
+					// not enough params
+					response.append("461 " + cl.nick + " JOIN :Not enough parameters");
+					break;
 				}
-			} else {
-				// not enough params
-				response.append("461 " + cl.nick + " JOIN :Not enough parameters");
-				break;
+				cout << cl.nick << " has joined " << chnlname << endl;
 			}
-			cout << cl.nick << " has joined " << msg.params << endl;
 			break;
 		case 5: // QUIT
 			/**

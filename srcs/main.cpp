@@ -96,7 +96,7 @@ int main(int ac, char **av) {
 					// use first available pollfd in array:
 					for (size_t j = 1; j <= fd_count; ++j) {
 						if (fds[j].fd == -1) {
-							fds[j].fd = client_socket; // <--- culprit of random seggies. previously was fds[fd_count].
+							fds[j].fd = client_socket;
 							fds[j].events = POLLIN;
 						}
 					}
