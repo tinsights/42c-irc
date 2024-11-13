@@ -30,8 +30,6 @@ To build and run this IRC server, you will need:
 
 2. **Build the Project**:
    ```bash
-   mkdir build
-   cd build
    make
    ```
 
