@@ -66,14 +66,6 @@ Here are some basic commands you can use:
 
 A video demonstration showcasing how to set up and use the IRC server will be available soon. Stay tuned!
 
-## Contributing
-
-Contributions are welcome! If you'd like to contribute to this project, please fork the repository and submit a pull request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 For questions or feedback, please open an issue in the GitHub repository.
