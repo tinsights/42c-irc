@@ -24,7 +24,7 @@ To build and run this IRC server, you will need:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/irc-server.git
+   git clone https://github.com/tinsights/irc-server.git
    cd irc-server
    ```
 
